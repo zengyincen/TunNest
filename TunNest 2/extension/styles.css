@@ -1,0 +1,54 @@
+@font-face {
+  font-family: "Noto Sans SC Subset";
+  src: url("fonts/NotoSansSC-UI.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+}
+:root { --ink:#1d1d1f; --muted:#86868b; --canvas:#f5f5f7; --surface:#fff; --line:rgba(0,0,0,.075); --blue:#007aff; --green:#34c759; --red:#ff3b30; font-family:"Noto Sans SC Subset","Noto Sans SC","PingFang SC",sans-serif; color:var(--ink); background:var(--canvas); }
+* { box-sizing:border-box; }
+body { margin:0; background:var(--canvas); color:var(--ink); font-size:14px; }
+.shell { width:370px; min-height:530px; padding:19px; }
+.wide { max-width:760px; margin:auto; padding:48px 24px 80px; }
+.brand { display:flex; align-items:center; gap:9px; font-weight:700; font-size:17px; }
+.brand-mark { width:28px; height:28px; border-radius:9px; display:grid; place-items:center; background:var(--ink); color:#fff; }
+.hero { padding:27px 3px 19px; }
+.eyebrow { font-size:11px; color:var(--muted); font-weight:650; letter-spacing:.06em; }
+.hero h1,.wide h1 { font-size:29px; line-height:1.12; letter-spacing:-.045em; margin:8px 0; }
+.wide h1 { font-size:42px; margin-top:28px; }
+.hero p,.hint { color:var(--muted); line-height:1.6; margin:0; }
+.card { background:var(--surface); border:1px solid var(--line); border-radius:19px; padding:16px; margin:11px 0; box-shadow:0 10px 32px rgba(0,0,0,.035); }
+.grid { display:grid; grid-template-columns:1fr 1fr; gap:9px; }
+.source-button,button { appearance:none; border:0; border-radius:14px; padding:13px; font:600 13px inherit; background:#e9e9eb; color:var(--ink); cursor:pointer; transition:.15s; }
+.source-button:hover,button:hover { transform:translateY(-1px); }
+button.primary { width:100%; background:var(--ink); color:#fff; }
+button.blue { background:var(--blue); color:#fff; }
+button.link { background:transparent; color:var(--blue); padding:6px; }
+button:disabled { opacity:.45; transform:none; }
+.status-row { display:flex; align-items:center; gap:8px; font-size:12px; color:var(--muted); }
+.dot { width:8px; height:8px; border-radius:99px; background:#c7c7cc; }
+.dot.ok { background:var(--green); } .dot.warn { background:#ff9f0a; }
+.top-row { display:flex; align-items:center; justify-content:space-between; }
+.label { font-size:12px; color:var(--muted); font-weight:650; margin:15px 0 8px; }
+input,textarea { width:100%; padding:12px 13px; border:1px solid var(--line); border-radius:13px; background:#f6f6f7; font:13px inherit; outline:none; }
+input:focus,textarea:focus { border-color:#007aff88; box-shadow:0 0 0 3px #007aff12; }
+.toast { min-height:21px; padding:5px 2px; font-size:12px; color:var(--muted); }
+.toast.error { color:var(--red); }
+.history { padding:10px 0; border-bottom:1px solid var(--line); display:flex; justify-content:space-between; gap:10px; font-size:12px; }
+.history:last-child { border:0; } .history span:last-child { color:var(--muted); }
+.plans { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin:24px 0; }
+.plan { background:#fff; border:1px solid var(--line); border-radius:22px; padding:20px; display:flex; flex-direction:column; min-height:190px; }
+.plan.featured { border-color:#007aff55; box-shadow:0 14px 40px #007aff12; }
+.plan-name { font-weight:650; } .price { font-size:27px; font-weight:750; letter-spacing:-.04em; margin:12px 0 5px; }
+.plan .hint { font-size:12px; flex:1; }
+.section { margin:35px 0; } .section h2 { font-size:20px; letter-spacing:-.02em; }
+.form-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+.full { grid-column:1/-1; }
+.badge { display:inline-flex; border-radius:99px; padding:6px 10px; background:#e8f8ec; color:#248a3d; font-size:11px; font-weight:650; }
+.hidden { display:none !important; }
+.device-code { font:700 23px "SF Mono",monospace; letter-spacing:.08em; cursor:pointer; margin:4px 0 9px; }
+.paywall { border-color:#ff9f0a55; background:linear-gradient(145deg,#fff,#fff8ed); }
+.paywall h2 { font-size:19px; letter-spacing:-.02em; margin:10px 0 6px; }
+.paywall button { margin-top:14px; }
+@media(max-width:700px) { .plans,.form-grid { grid-template-columns:1fr 1fr; } }
+@media(max-width:480px) { .plans,.form-grid { grid-template-columns:1fr; } }
