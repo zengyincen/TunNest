@@ -1,0 +1,21 @@
+{
+  "name": "tunnest",
+  "version": "1.1.0",
+  "private": true,
+  "type": "module",
+  "description": "囤囤（TunNest）：微信读书、豆瓣、微博与网页到 Notion 的浏览器扩展和每日同步 Actions",
+  "scripts": {
+    "test": "node --test test/*.test.mjs",
+    "check": "node scripts/check-project.mjs",
+    "package": "node scripts/package-extension.mjs",
+    "sync": "node automation/sync.mjs",
+    "license:issue": "node tools/issue-license.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "yaml": "^2.9.0"
+  }
+}

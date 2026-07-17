@@ -1,0 +1,31 @@
+name: Issue TunNest subscription license
+on:
+  workflow_dispatch:
+    inputs:
+      customer_id: { description: Customer/order id, required: true, type: string }
+      plan: { description: Plan, required: true, type: choice, options: [monthly, halfyear, yearly, lifetime] }
+      note: { description: Internal note, required: false, type: string }
+permissions:
+  contents: read
+jobs:
+  issue:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 24 }
+      - name: Issue license
+        env:
+          LICENSE_API_BASE: ${{ vars.LICENSE_API_BASE }}
+          LICENSE_ADMIN_TOKEN: ${{ secrets.LICENSE_ADMIN_TOKEN }}
+          CUSTOMER_ID: ${{ inputs.customer_id }}
+          PLAN: ${{ inputs.plan }}
+          NOTE: ${{ inputs.note }}
+        run: node tools/issue-license.mjs
+      - name: Download license key
+        uses: actions/upload-artifact@v4
+        with:
+          name: license-${{ inputs.customer_id }}-${{ inputs.plan }}
+          path: license.txt
+          retention-days: 7
+          if-no-files-found: error
