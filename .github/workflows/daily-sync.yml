@@ -1,0 +1,58 @@
+name: TunNest daily content sync
+
+on:
+  workflow_dispatch:
+    inputs:
+      source:
+        description: Sync source
+        type: choice
+        options: [all, weread, douban]
+        default: all
+  schedule:
+    - cron: "23 18 * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: daily-content-sync
+  cancel-in-progress: false
+
+jobs:
+  weread:
+    if: ${{ github.event_name == 'schedule' || inputs.source == 'all' || inputs.source == 'weread' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 24 }
+      - name: Sync WeRead to Notion
+        run: node automation/sync.mjs
+        env:
+          SOURCE: weread
+          LICENSE_API_BASE: ${{ vars.LICENSE_API_BASE }}
+          TUNNEST_LICENSE_KEY: ${{ secrets.TUNNEST_LICENSE_KEY }}
+          NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
+          NOTION_DATABASE_ID: ${{ secrets.NOTION_DATABASE_ID }}
+          WEREAD_API_KEY: ${{ secrets.WEREAD_API_KEY }}
+
+  douban:
+    if: ${{ github.event_name == 'schedule' || inputs.source == 'all' || inputs.source == 'douban' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 24 }
+      - name: Sync Douban to Notion
+        run: node automation/sync.mjs
+        env:
+          SOURCE: douban
+          LICENSE_API_BASE: ${{ vars.LICENSE_API_BASE }}
+          TUNNEST_LICENSE_KEY: ${{ secrets.TUNNEST_LICENSE_KEY }}
+          NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
+          NOTION_DATABASE_ID: ${{ secrets.NOTION_DATABASE_ID }}
+          DOUBAN_USER_ID: ${{ secrets.DOUBAN_USER_ID }}
+          DOUBAN_API_KEY: ${{ secrets.DOUBAN_API_KEY }}
+          DOUBAN_AUTH_TOKEN: ${{ secrets.DOUBAN_AUTH_TOKEN }}
