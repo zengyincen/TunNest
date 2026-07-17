@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <link rel="stylesheet" href="styles.css"><title>囤囤 TunNest 设置</title>
+</head>
+<body><main class="wide">
+  <div class="brand"><span class="brand-mark">T</span>囤囤 TunNest</div>
+  <h1>连接、同步、长期拥有。</h1>
+  <p class="hint">内容从浏览器或 GitHub Actions 直接进入你的 Notion；Cloudflare 只验证订阅状态。</p>
+
+  <section class="section"><h2>订阅</h2>
+    <div id="entitlement" class="card">正在验证…</div>
+    <div class="card"><div class="label">本机安装码</div><div id="installationCode" class="device-code">读取中…</div><p class="hint">这是扩展随机生成的安装标识，不是硬件序列号；服务器只保存它的哈希。</p><button id="deactivateDevice" class="secondary hidden">释放本机付费授权</button></div>
+    <div class="plans" id="plans"></div>
+    <div class="card"><div class="label">许可证</div><input id="licenseKey" placeholder="tunnest_…"><button id="activate" class="primary" style="margin-top:10px">在线激活</button><div id="licenseToast" class="toast"></div></div>
+  </section>
+
+  <section class="section"><h2>Notion</h2>
+    <div class="card form-grid"><div class="full"><div class="label">Integration Token</div><input id="notionToken" type="password" placeholder="ntn_… / secret_…"></div><div><div class="label">父页面链接（新建数据库）</div><input id="parentPage" placeholder="https://www.notion.so/…"></div><div><div class="label">已有数据库 ID（可选）</div><input id="databaseId" placeholder="32 位 ID"></div><div class="full"><button id="connectNotion" class="blue">连接 Notion</button><div id="notionToast" class="toast"></div></div></div>
+  </section>
+
+  <section class="section"><h2>自动同步来源</h2>
+    <div class="card form-grid"><div><div class="label">豆瓣用户 ID</div><input id="doubanUserId"></div><div><div class="label">豆瓣 API Key</div><input id="doubanApiKey" type="password"></div><div class="full"><div class="label">豆瓣 Auth Token（私密条目需要）</div><input id="doubanAuthToken" type="password"></div><div><div class="label">微博用户 UID</div><input id="weiboUids" placeholder="多个 UID 用逗号分隔"></div><div><div class="label">微博同步页数</div><input id="weiboPages" type="number" min="1" max="10" value="2"></div><div class="full"><button id="saveSources" class="primary">保存来源设置</button><div id="sourceToast" class="toast"></div></div></div>
+    <p class="hint">微信读书和微博会使用当前浏览器登录态。GitHub Actions 使用单独配置的 Secrets。</p>
+  </section>
+</main><script type="module" src="options.js"></script></body></html>
