@@ -1,10 +1,10 @@
 # 囤囤（TunNest）验证记录
 
-验证日期：2026-07-17
+验证日期：2026-07-22
 
 ## 已通过
 
-- 根项目 6 个测试：中英文品牌名、套餐价格、Action 来源边界、豆瓣标准化、7 天试用、付费 Action 限制
+- 根项目 10 个测试：中英文品牌名、套餐价格、Action 来源边界、豆瓣标准化、四数据库字段、按来源路由、Actions 独立数据库、Notion Emoji 载荷、7 天试用、付费 Action 限制
 - 全部 JavaScript/MJS `node --check`
 - 扩展 manifest、图标和 Noto Sans SC 字体资源完整性
 - 扩展 ZIP 完整性检查
@@ -15,6 +15,7 @@
 - 同一 Chrome Sync 试用标识在更换安装码后沿用相同到期时间
 - 试用到期返回 `TRIAL_EXPIRED` 并进入付费墙
 - 3 个浏览器槽位与 1 个独立 Actions 槽位验证通过；释放旧浏览器后可绑定新设备
+- 网页剪藏、微信读书、豆瓣和微博四套 Notion 数据库 schema 与设置项静态验证通过
 - License Worker Wrangler dry-run
 - npm production audit：0 vulnerabilities
 

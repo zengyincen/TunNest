@@ -5,7 +5,11 @@ compatibility_date = "2026-07-17"
 [[d1_databases]]
 binding = "DB"
 database_name = "tunnest-license"
-database_id = "REPLACE_WITH_D1_DATABASE_ID"
+database_id = "6cc480d3-8712-4172-b7fd-9f56ce2a27cf"
 
 [vars]
 ALLOWED_ORIGIN = "*"
+
+[[routes]]
+pattern = "tnlcs.imnotfound.eu.org"
+custom_domain = true

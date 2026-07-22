@@ -4,12 +4,12 @@ export const PRODUCT = {
   trialDays: 7,
   browserDeviceLimit: 3,
   actionsLimit: 1,
-  licenseApiBase: "https://tunnest-license.example.workers.dev",
-  supportUrl: "mailto:support@example.com",
+  licenseApiBase: "https://tnlcs.imnotfound.eu.org",
+  supportUrl: "mailto:zengyincen@foxmail.com",
   plans: [
-    { id: "monthly", name: "月度", price: "¥9.9", days: 31, checkoutUrl: "https://example.com/buy/monthly" },
-    { id: "halfyear", name: "半年", price: "¥19.9", days: 183, checkoutUrl: "https://example.com/buy/halfyear" },
-    { id: "yearly", name: "年度", price: "¥39.9", days: 366, checkoutUrl: "https://example.com/buy/yearly" },
-    { id: "lifetime", name: "永久", price: "¥299", days: null, checkoutUrl: "https://example.com/buy/lifetime" }
+    { id: "monthly", name: "月度", price: "¥9.9", days: 31, checkoutUrl: "https://app.notion.com/p/zengyincen/1483c0bb724d801c8b31fe333a201a95" },
+    { id: "halfyear", name: "半年", price: "¥19.9", days: 183, checkoutUrl: "https://app.notion.com/p/zengyincen/1483c0bb724d801c8b31fe333a201a95" },
+    { id: "yearly", name: "年度", price: "¥39.9", days: 366, checkoutUrl: "https://app.notion.com/p/zengyincen/1483c0bb724d801c8b31fe333a201a95" },
+    { id: "lifetime", name: "永久", price: "¥299", days: null, checkoutUrl: "https://app.notion.com/p/zengyincen/1483c0bb724d801c8b31fe333a201a95" }
   ]
 };

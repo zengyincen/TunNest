@@ -2,14 +2,15 @@
 
 ```mermaid
 flowchart LR
-  B["浏览器扩展"] -->|"内容直写"| N["用户 Notion"]
-  G["GitHub Actions\n微信读书 / 豆瓣"] -->|"内容直写"| N
+  B["浏览器扩展"] -->|"按来源路由"| N["用户的四个 Notion 数据库"]
+  G["GitHub Actions\n微信读书 / 豆瓣"] -->|"分别写入专属数据库"| N
   B -->|"试用/许可证 + 随机安装码"| L["Cloudflare License Worker"]
   G -->|"付费许可证 + 固定 Actions 槽位"| L
   L --> D[("D1\n试用期限 / 许可证哈希 / 安装码哈希")]
 ```
 
 - Notion Token 只保存在浏览器 `chrome.storage.local` 或 GitHub encrypted secrets。
+- 网页剪藏、微信读书、豆瓣和微博分别保存独立数据库 ID；四个数据库可以位于不同 Notion 父页面，共用一个 Integration Token。
 - 微信读书网页 Cookie 和微博 Cookie 不离开浏览器。
 - Worker 只处理订阅授权，不接收正文、Cookie、Notion Token 或用户资料库内容。
 - Chrome 不提供适合此用途的硬件唯一编码。扩展首次运行时生成 128 位随机安装码，只把 SHA-256 哈希交给 Worker；这比读取硬件指纹更稳定，也更符合商店隐私要求。

@@ -2,10 +2,12 @@ import { PRODUCT } from "./config.js";
 import { activateLicense, deactivateCurrentDevice, entitlement } from "./lib/license.js";
 
 const $ = (selector) => document.querySelector(selector);
-const keys = ["licenseKey","notionToken","notionDatabaseId","doubanUserId","doubanApiKey","doubanAuthToken","weiboUids","weiboPages"];
+const notionSources=["clip","weread","douban","weibo"];
+const keys = ["licenseKey","notionToken","notionDatabaseIds","notionDatabaseId","doubanUserId","doubanApiKey","doubanAuthToken","weiboUids","weiboPages"];
 const stored = await chrome.storage.local.get(keys);
 for (const key of ["licenseKey","notionToken","doubanUserId","doubanApiKey","doubanAuthToken","weiboUids","weiboPages"]) if ($(`#${key}`)) $(`#${key}`).value = stored[key] || $(`#${key}`).value || "";
-$("#databaseId").value = stored.notionDatabaseId || "";
+const notionDatabaseIds={...(stored.notionDatabaseIds||{})};if(!notionDatabaseIds.clip&&stored.notionDatabaseId)notionDatabaseIds.clip=stored.notionDatabaseId;
+for(const source of notionSources)$(`#${source}DatabaseId`).value=notionDatabaseIds[source]||"";
 renderPlans();
 await renderEntitlement();
 
@@ -22,12 +24,12 @@ $("#deactivateDevice").addEventListener("click", async () => {
 });
 
 $("#installationCode").addEventListener("click", () => navigator.clipboard.writeText($("#installationCode").textContent));
-$("#connectNotion").addEventListener("click", async () => {
-  setToast("notion", "正在连接…");
-  const result = await chrome.runtime.sendMessage({ type:"SETUP_NOTION", notionToken:$("#notionToken").value.trim(), parentPage:$("#parentPage").value.trim(), databaseId:$("#databaseId").value.trim() });
-  if (result.ok) { $("#databaseId").value=result.database.id; setToast("notion",`已连接 ${result.database.title}`); }
-  else setToast("notion",result.error,true);
-});
+document.querySelectorAll("[data-notion-source]").forEach((button)=>button.addEventListener("click",async()=>{
+  const source=button.dataset.notionSource,prefix=`${source}Notion`;setToast(prefix,"正在连接…");button.disabled=true;
+  const result=await chrome.runtime.sendMessage({type:"SETUP_NOTION",source,notionToken:$("#notionToken").value.trim(),parentPage:$(`#${source}ParentPage`).value.trim(),databaseId:$(`#${source}DatabaseId`).value.trim()});
+  if(result.ok){$(`#${source}DatabaseId`).value=result.database.id;setToast(prefix,`已连接 ${result.database.title}`);}else setToast(prefix,result.error,true);
+  button.disabled=false;
+}));
 $("#saveSources").addEventListener("click", async () => {
   const settings=Object.fromEntries(["doubanUserId","doubanApiKey","doubanAuthToken","weiboUids","weiboPages"].map((key)=>[key,$(`#${key}`).value.trim()]));
   const result=await chrome.runtime.sendMessage({type:"SAVE_SETTINGS",settings}); setToast("source",result.ok?"设置已保存":result.error,!result.ok);

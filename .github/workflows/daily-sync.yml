@@ -34,6 +34,7 @@ jobs:
           LICENSE_API_BASE: ${{ vars.LICENSE_API_BASE }}
           TUNNEST_LICENSE_KEY: ${{ secrets.TUNNEST_LICENSE_KEY }}
           NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
+          NOTION_WEREAD_DATABASE_ID: ${{ secrets.NOTION_WEREAD_DATABASE_ID }}
           NOTION_DATABASE_ID: ${{ secrets.NOTION_DATABASE_ID }}
           WEREAD_API_KEY: ${{ secrets.WEREAD_API_KEY }}
 
@@ -52,6 +53,7 @@ jobs:
           LICENSE_API_BASE: ${{ vars.LICENSE_API_BASE }}
           TUNNEST_LICENSE_KEY: ${{ secrets.TUNNEST_LICENSE_KEY }}
           NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
+          NOTION_DOUBAN_DATABASE_ID: ${{ secrets.NOTION_DOUBAN_DATABASE_ID }}
           NOTION_DATABASE_ID: ${{ secrets.NOTION_DATABASE_ID }}
           DOUBAN_USER_ID: ${{ secrets.DOUBAN_USER_ID }}
           DOUBAN_API_KEY: ${{ secrets.DOUBAN_API_KEY }}
