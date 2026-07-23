@@ -4,7 +4,6 @@ import { readFileSync } from "node:fs";
 import { NOTION_DATABASE_SCHEMAS, syncItems, verifyNotion } from "../extension/lib/notion.js";
 
 const background=readFileSync(new URL("../extension/background.js",import.meta.url),"utf8");
-const manifest=JSON.parse(readFileSync(new URL("../extension/manifest.json",import.meta.url),"utf8"));
 const options=readFileSync(new URL("../extension/options.html",import.meta.url),"utf8");
 const workflow=readFileSync(new URL("../.github/workflows/daily-sync.yml",import.meta.url),"utf8");
 const notionClient=readFileSync(new URL("../extension/lib/notion.js",import.meta.url),"utf8");
@@ -14,10 +13,10 @@ test("defines independent Notion schemas including four Douban databases",()=>{
   assert.deepEqual(Object.keys(NOTION_DATABASE_SCHEMAS),["clip","weread","douban","doubanMovieTop250","doubanBookTop250","doubanMusicTop250","weibo"]);
   assert.deepEqual(Object.keys(NOTION_DATABASE_SCHEMAS.clip.properties),["标题","封面","类型","原文","作者","摘要","标签","收藏时间","外部 ID"]);
   assert.deepEqual(Object.keys(NOTION_DATABASE_SCHEMAS.weread.properties),["书名","封面","作者","原书链接","划线数量","同步摘要","标签","同步时间","外部 ID"]);
-  assert.deepEqual(Object.keys(NOTION_DATABASE_SCHEMAS.douban.properties),["名称","封面","类型","原条目","主创","状态","评分","短评","标签","收藏时间","外部 ID"]);
-  for(const source of ["doubanMovieTop250","doubanBookTop250","doubanMusicTop250"]){
-    assert.deepEqual(Object.keys(NOTION_DATABASE_SCHEMAS[source].properties),["名称","封面","排名","评分","评价人数","信息","推荐语","原条目","标签","抓取时间","外部 ID"]);
-  }
+  assert.deepEqual(Object.keys(NOTION_DATABASE_SCHEMAS.douban.properties),["名称","封面","封面原图","类型","原条目","主创","状态","评分","短评","标签","收藏时间","外部 ID"]);
+  assert.deepEqual(Object.keys(NOTION_DATABASE_SCHEMAS.doubanMovieTop250.properties),["名称","封面","封面原图","排名","评分","评价人数","导演","主演","年份","国家/地区","类型","推荐语","原条目","标签","抓取时间","外部 ID"]);
+  assert.deepEqual(Object.keys(NOTION_DATABASE_SCHEMAS.doubanBookTop250.properties),["名称","封面","封面原图","排名","评分","评价人数","作者","译者","出版社","出版日期","定价","推荐语","原条目","标签","抓取时间","外部 ID"]);
+  assert.deepEqual(Object.keys(NOTION_DATABASE_SCHEMAS.doubanMusicTop250.properties),["名称","封面","封面原图","排名","评分","评价人数","艺术家","发行日期","版本类型","介质","流派","推荐语","原条目","标签","抓取时间","外部 ID"]);
   assert.deepEqual(Object.keys(NOTION_DATABASE_SCHEMAS.weibo.properties),["博文","封面","用户","原博文","正文摘要","转发数","评论数","点赞数","标签","发布时间","外部 ID"]);
   for(const schema of Object.values(NOTION_DATABASE_SCHEMAS)){
     assert.equal(Object.values(schema.properties).filter(value=>"title" in value).length,1);
@@ -47,11 +46,9 @@ test("uses separate WeRead and Douban database secrets in Actions",()=>{
   assert.match(workflow,/NOTION_DOUBAN_MUSIC_TOP250_DATABASE_ID/);
 });
 
-test("allows Douban artwork downloads with an anti-hotlinking header rule",()=>{
-  assert.ok(manifest.host_permissions.includes("https://*.doubanio.com/*"));
-  assert.match(background,/DOUBAN_IMAGE_HEADER_RULE_ID/);
-  assert.match(background,/requestDomains:\s*\["doubanio\.com"\]/);
-  assert.match(background,/value:\s*"https:\/\/www\.douban\.com\/"/);
+test("routes Douban artwork through the configured Cloudflare image proxy",()=>{
+  assert.match(notionClient,/\/v1\/images\/douban\?url=/);
+  assert.match(notionClient,/PRODUCT\.licenseApiBase/);
 });
 
 test("uses Notion-supported emoji icons in block payloads",()=>{
@@ -84,43 +81,44 @@ test("writes a Top 250 entry as property-only structured data",async()=>{
   const previousFetch=globalThis.fetch,calls=[];
   globalThis.fetch=async(url,init={})=>{calls.push({url:String(url),init});const value=String(url),data=value.endsWith("/query")?{results:[]}:value.includes("/databases/")&&init.method!=="PATCH"?databaseData("doubanMovieTop250"):value.endsWith("/pages")?{id:"top-page"}:{};return{ok:true,status:200,json:async()=>data};};
   try{
-    const result=await syncItems("token","d".repeat(32),[{source:"doubanMovieTop250",kind:"movie",externalId:"1292052",title:"肖申克的救赎",url:"https://movie.douban.com/subject/1292052/",coverUrl:"https://img.test/poster.jpg",tags:["豆瓣","电影 Top 250"],capturedAt:"2026-07-23T00:00:00Z",metadata:{rank:1,rating:9.7,ratingCount:3306537,info:"1994 / 美国",quote:"希望让人自由。"}}],"doubanMovieTop250");
+    const result=await syncItems("token","d".repeat(32),[{source:"doubanMovieTop250",kind:"movie",externalId:"1292052",title:"肖申克的救赎",url:"https://movie.douban.com/subject/1292052/",coverUrl:"https://img.test/poster.jpg",tags:["豆瓣","电影 Top 250"],capturedAt:"2026-07-23T00:00:00Z",metadata:{rank:1,rating:9.7,ratingCount:3306537,director:"弗兰克·德拉邦特",cast:"蒂姆·罗宾斯",years:"1994",region:"美国",genres:["犯罪","剧情"],quote:"希望让人自由。"}}],"doubanMovieTop250");
     assert.equal(result[0].ok,true);
     const payload=JSON.parse(calls.find(call=>call.url.endsWith("/pages")).init.body);
     assert.equal(payload.children,undefined);
     assert.equal(payload.properties["排名"].number,1);
     assert.equal(payload.properties["评分"].number,9.7);
     assert.equal(payload.properties["评价人数"].number,3306537);
+    assert.equal(payload.properties["导演"].rich_text[0].text.content,"弗兰克·德拉邦特");
+    assert.equal(payload.properties["主演"].rich_text[0].text.content,"蒂姆·罗宾斯");
+    assert.equal(payload.properties["年份"].rich_text[0].text.content,"1994");
+    assert.equal(payload.properties["国家/地区"].rich_text[0].text.content,"美国");
+    assert.deepEqual(payload.properties["类型"].multi_select,[{name:"犯罪"},{name:"剧情"}]);
     assert.equal(payload.properties["推荐语"].rich_text[0].text.content,"希望让人自由。");
   }finally{globalThis.fetch=previousFetch;}
 });
 
-test("downloads a Douban cover and stores it in Notion instead of hotlinking",async()=>{
+test("uses a cached Cloudflare URL for Douban covers without downloading or uploading",async()=>{
   const previousFetch=globalThis.fetch,calls=[],coverUrl="https://img1.doubanio.com/view/photo/s_ratio_poster/public/p480747492.jpg";
   globalThis.fetch=async(url,init={})=>{
     calls.push({url:String(url),init});
     const value=String(url);
-    if(value===coverUrl)return{ok:true,status:200,blob:async()=>new Blob(["douban-cover"],{type:"image/jpeg"})};
     let data={};
     if(value.endsWith("/query"))data={results:[]};
     else if(value.includes("/databases/")&&init.method!=="PATCH")data=databaseData("doubanMovieTop250","e".repeat(32));
-    else if(value.endsWith("/file_uploads"))data={id:"douban-upload",status:"pending"};
-    else if(value.endsWith("/file_uploads/douban-upload/send"))data={id:"douban-upload",status:"uploaded"};
     else if(value.endsWith("/pages"))data={id:"douban-page"};
     return{ok:true,status:200,json:async()=>data};
   };
   try{
     const result=await syncItems("token","e".repeat(32),[{kind:"movie",externalId:"1292052",title:"肖申克的救赎",url:"https://movie.douban.com/subject/1292052/",coverUrl,tags:["豆瓣"],capturedAt:"2026-07-23T00:00:00Z",metadata:{rank:1}}],"doubanMovieTop250");
     assert.equal(result[0].ok,true);
-    const download=calls.find(call=>call.url===coverUrl);
-    assert.equal(download.init.headers.Referer,"https://www.douban.com/");
-    const send=calls.find(call=>call.url.endsWith("/file_uploads/douban-upload/send"));
-    assert.ok(send.init.body instanceof FormData);
+    assert.equal(calls.some(call=>call.url===coverUrl),false);
+    assert.equal(calls.some(call=>call.url.includes("/file_uploads")),false);
     const create=calls.find(call=>call.url.endsWith("/pages"));
     const payload=JSON.parse(create.init.body);
-    assert.deepEqual(payload.properties["封面"],{files:[{name:"封面",type:"file_upload",file_upload:{id:"douban-upload"}}]});
-    assert.deepEqual(payload.cover,{type:"file_upload",file_upload:{id:"douban-upload"}});
-    assert.equal(create.init.headers["Notion-Version"],"2026-03-11");
+    const proxyUrl=`https://tnlcs.imnotfound.eu.org/v1/images/douban?url=${encodeURIComponent(coverUrl)}`;
+    assert.deepEqual(payload.properties["封面"],{files:[{name:"封面",type:"external",external:{url:proxyUrl}}]});
+    assert.deepEqual(payload.properties["封面原图"],{url:coverUrl});
+    assert.deepEqual(payload.cover,{type:"external",external:{url:proxyUrl}});
   }finally{globalThis.fetch=previousFetch;}
 });
 
@@ -152,12 +150,14 @@ test("batch-checks existing records and skips unchanged Top 250 writes",async()=
     kind:"music",externalId:`music-${index + 1}`,title:`唱片 ${index + 1}`,
     url:`https://music.douban.com/subject/${index + 1}/`,coverUrl:`https://img1.doubanio.com/view/photo/s_ratio_poster/public/p${index + 1}.jpg`,
     tags:["豆瓣","音乐 Top 250"],capturedAt:"2026-07-23T00:00:00Z",
-    metadata:{rank:index + 1,rating:9.1,ratingCount:1000 + index,info:`歌手 ${index + 1}`,quote:"推荐语"}
+    metadata:{rank:index + 1,rating:9.1,ratingCount:1000 + index,artist:`歌手 ${index + 1}`,releaseDate:"2026-01-01",releaseType:"专辑",medium:"CD",genres:["流行"],quote:"推荐语"}
   }));
   const pages=items.map((item)=>({id:`page-${item.externalId}`,properties:{
-    "名称":{title:[{plain_text:item.title}]},"封面":{files:[{type:"file",file:{url:"https://notion.example/cover.jpg"}}]},
+    "名称":{title:[{plain_text:item.title}]},"封面":{files:[{type:"file",file:{url:"https://notion.example/cover.jpg"}}]},"封面原图":{url:item.coverUrl},
     "排名":{number:item.metadata.rank},"评分":{number:item.metadata.rating},"评价人数":{number:item.metadata.ratingCount},
-    "信息":{rich_text:[{plain_text:item.metadata.info}]},"推荐语":{rich_text:[{plain_text:item.metadata.quote}]},
+    "艺术家":{rich_text:[{plain_text:item.metadata.artist}]},"发行日期":{rich_text:[{plain_text:item.metadata.releaseDate}]},
+    "版本类型":{select:{name:item.metadata.releaseType}},"介质":{select:{name:item.metadata.medium}},"流派":{multi_select:item.metadata.genres.map((name)=>({name}))},
+    "推荐语":{rich_text:[{plain_text:item.metadata.quote}]},
     "原条目":{url:item.url},"标签":{multi_select:item.tags.map((name)=>({name}))},"外部 ID":{rich_text:[{plain_text:item.externalId}]}
   }}));
   globalThis.fetch=async(url,init={})=>{

@@ -1,6 +1,6 @@
 # 囤囤（TunNest）许可证服务部署
 
-许可证 Worker 是整个项目唯一使用 Cloudflare 的部分，只存授权状态、7 天试用期限和匿名安装码哈希。
+许可证 Worker 是整个项目唯一使用 Cloudflare 的部分。D1 只存授权状态、7 天试用期限和匿名安装码哈希；Worker 还提供豆瓣封面流式代理和边缘缓存，但不把图片写入 D1 或对象存储。
 
 ```bash
 cd license-worker
@@ -16,6 +16,8 @@ npm run db:remote
 npx wrangler secret put ADMIN_TOKEN
 npm run deploy
 ```
+
+部署后除 `/v1/health` 外，还可使用 `/v1/images/douban?url=豆瓣图片地址`。该接口只接受 `https://*.doubanio.com/`，并为 Notion 提供可显示的缓存直链。
 
 `ADMIN_TOKEN` 建议使用至少 32 字节随机值。部署完成后，把 Worker URL 写入：
 

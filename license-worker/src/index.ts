@@ -1,24 +1,58 @@
-interface Env { DB: D1Database; ADMIN_TOKEN: string; ALLOWED_ORIGIN?: string; }
+type Env = WorkerBindings & { ADMIN_TOKEN: string };
 const encoder = new TextEncoder();
 const PLAN_DAYS: Record<string, number | null> = { monthly: 31, halfyear: 183, yearly: 366, lifetime: null };
 const TRIAL_DAYS = 7;
 const ACTIONS_LIMIT = 1;
 
-export default { async fetch(request: Request, env: Env): Promise<Response> {
+export default { async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
   if (request.method === "OPTIONS") return withCors(new Response(null, { status: 204 }), env);
-  try { return withCors(await route(request, env), env); }
+  try { return withCors(await route(request, env, ctx), env); }
   catch (error) { const status = error instanceof HttpError ? error.status : 500; if (status === 500) console.error(error); return withCors(json({ valid: false, error: error instanceof Error ? error.message : "服务器错误", ...(error instanceof HttpError ? error.detail || {} : {}) }, status), env); }
 } };
 
-async function route(request: Request, env: Env): Promise<Response> {
+async function route(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
   const url = new URL(request.url); const path = url.pathname.replace(/\/+$/, "");
   if (path === "/v1/health" && request.method === "GET") return json({ ok: true, service: "tunnest-license", time: new Date().toISOString() });
+  if (path === "/v1/images/douban" && request.method === "GET") return doubanImage(request, ctx);
   if (path === "/v1/licenses/verify" && request.method === "POST") return verify(request, env);
   if (path === "/v1/licenses/deactivate" && request.method === "POST") return deactivate(request, env);
   if (path === "/v1/trials/verify" && request.method === "POST") return verifyTrial(request, env);
   if (path === "/v1/admin/licenses" && request.method === "POST") { requireAdmin(request, env); return issue(request, env); }
   if (path.startsWith("/v1/admin/licenses/") && request.method === "PATCH") { requireAdmin(request, env); return update(request, env, path.split("/").pop()!); }
   throw new HttpError(404, "接口不存在");
+}
+
+async function doubanImage(request: Request, ctx: ExecutionContext): Promise<Response> {
+  const value = new URL(request.url).searchParams.get("url") || "";
+  let source: URL;
+  try { source = new URL(value); } catch { throw new HttpError(400, "豆瓣图片地址无效"); }
+  if (source.protocol !== "https:" || !/(^|\.)doubanio\.com$/i.test(source.hostname) || source.href.length > 2000) throw new HttpError(400, "仅支持豆瓣图片地址");
+  const cache = caches.default;
+  const cacheKey = new Request(request.url, { method: "GET" });
+  const cached = await cache.match(cacheKey);
+  if (cached) return cached;
+  const upstream = await fetch(source.href, {
+    headers: {
+      Accept: "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
+      Referer: "https://www.douban.com/",
+      "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/138.0 Safari/537.36"
+    }
+  });
+  if (!upstream.ok) throw new HttpError(502, `豆瓣图片获取失败 (${upstream.status})`);
+  const contentType = upstream.headers.get("Content-Type") || "";
+  if (!contentType.toLowerCase().startsWith("image/")) throw new HttpError(502, "豆瓣返回的不是图片");
+  const contentLength = Number(upstream.headers.get("Content-Length")) || 0;
+  if (contentLength > 20 * 1024 * 1024) throw new HttpError(413, "豆瓣图片超过 20MB 限制");
+  const headers = new Headers({
+    "Content-Type": contentType,
+    "Cache-Control": "public, max-age=2592000, s-maxage=2592000, immutable",
+    "X-Content-Type-Options": "nosniff",
+    "Access-Control-Allow-Origin": "*"
+  });
+  const etag = upstream.headers.get("ETag"); if (etag) headers.set("ETag", etag);
+  const response = new Response(upstream.body, { status: 200, headers });
+  ctx.waitUntil(cache.put(cacheKey, response.clone()));
+  return response;
 }
 
 async function verify(request: Request, env: Env): Promise<Response> {

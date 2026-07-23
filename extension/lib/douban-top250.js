@@ -54,13 +54,14 @@ function parseEntry(block, kind, source, fallbackRank, capturedAt) {
   const ratingCount = Number(String(match(block, /([\d,]+)\s*人评价/i) || "").replace(/,/g, "")) || null;
   const info = cleanText(match(block, /<p\b[^>]*class\s*=\s*["'][^"']*pl[^"']*["'][^>]*>([\s\S]*?)<\/p>/i) || movieInfo(block));
   const quote = cleanText(match(block, /<p\b[^>]*class\s*=\s*["'][^"']*quote[^"']*["'][^>]*>([\s\S]*?)<\/p>/i) || match(block, /<span\b[^>]*class\s*=\s*["'][^"']*inq[^"']*["'][^>]*>([\s\S]*?)<\/span>/i));
+  const details = top250Details(info, kind);
   const label = ({ movie: "电影", book: "图书", music: "音乐" })[kind];
   return {
     source,
     kind,
     externalId,
     title: cleanText(title),
-    author: info.split(" / ")[0] || "",
+    author: details.director || details.author || details.artist || "",
     url,
     excerpt: quote || info,
     content: [info, quote].filter(Boolean).join("\n\n"),
@@ -68,7 +69,43 @@ function parseEntry(block, kind, source, fallbackRank, capturedAt) {
     tags: ["豆瓣", label + " Top 250"],
     highlights: [],
     capturedAt,
-    metadata: { rank, rating, ratingCount, info, quote }
+    metadata: { rank, rating, ratingCount, info, quote, ...details }
+  };
+}
+
+function top250Details(info, kind) {
+  const parts = String(info || "").split(" / ").map((part) => part.trim()).filter(Boolean);
+  if (kind === "movie") {
+    const yearIndex = parts.findIndex((part) => /^\d{4}(?:\b|\()/i.test(part));
+    const credits = (yearIndex < 0 ? parts : parts.slice(0, yearIndex)).join(" / ");
+    const timeline = yearIndex < 0 ? [] : parts.slice(yearIndex);
+    let yearCount = 0;
+    while (yearCount < timeline.length && /^\d{4}(?:\b|\()/i.test(timeline[yearCount])) yearCount++;
+    return {
+      director: cleanText(match(credits, /导演:\s*([\s\S]*?)(?:\s+主演:|$)/i)),
+      cast: cleanText(match(credits, /主演:\s*([\s\S]*)$/i)).replace(/\s*\/\.\.\.$/, ""),
+      years: timeline.slice(0, yearCount).join(" / "),
+      region: timeline[yearCount] || "",
+      genres: timeline.slice(yearCount + 1).join(" / ").split(/\s+/).filter(Boolean)
+    };
+  }
+  if (kind === "book") {
+    const publicationIndex = parts.findLastIndex((part) => /(?:^|\D)\d{4}(?:\D|$)/.test(part));
+    const publisherIndex = publicationIndex > 0 ? publicationIndex - 1 : -1;
+    return {
+      author: publisherIndex > 0 ? parts[0] || "" : "",
+      translators: publisherIndex > 1 ? parts.slice(1, publisherIndex).join(" / ") : "",
+      publisher: publisherIndex >= 0 ? parts[publisherIndex] : parts[0] || "",
+      publicationDate: publicationIndex >= 0 ? parts[publicationIndex] : "",
+      price: publicationIndex >= 0 ? parts.slice(publicationIndex + 1).join(" / ") : ""
+    };
+  }
+  return {
+    artist: parts[0] || "",
+    releaseDate: parts[1] || "",
+    releaseType: parts.length > 4 ? parts.slice(2, -2).join(" / ") : "",
+    medium: parts.length >= 4 ? parts.at(-2) : "",
+    genres: parts.length >= 3 ? String(parts.at(-1) || "").split(/\s*\/\s*/).filter(Boolean) : []
   };
 }
 

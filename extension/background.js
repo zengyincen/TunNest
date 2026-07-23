@@ -6,7 +6,6 @@ const activeRuns = new Map();
 const WEIBO_IMAGE_HEADER_RULE_ID = 1001;
 const DOUBAN_API_HEADER_RULE_ID = 1002;
 const DOUBAN_WEB_HEADER_RULE_ID = 1003;
-const DOUBAN_IMAGE_HEADER_RULE_ID = 1004;
 const DOUBAN_DATABASE_SOURCES = ["douban", ...DOUBAN_TOP250_TARGETS.map((target) => target.source)];
 let remoteHeadersReady = installRemoteHeaderRules().catch(logHeaderRuleError);
 
@@ -119,7 +118,7 @@ async function cancelSync(source) {
 
 function installRemoteHeaderRules() {
   return chrome.declarativeNetRequest.updateDynamicRules({
-    removeRuleIds: [WEIBO_IMAGE_HEADER_RULE_ID, DOUBAN_API_HEADER_RULE_ID, DOUBAN_WEB_HEADER_RULE_ID, DOUBAN_IMAGE_HEADER_RULE_ID],
+    removeRuleIds: [WEIBO_IMAGE_HEADER_RULE_ID, DOUBAN_API_HEADER_RULE_ID, DOUBAN_WEB_HEADER_RULE_ID, 1004],
     addRules: [{
       id: WEIBO_IMAGE_HEADER_RULE_ID,
       priority: 1,
@@ -165,21 +164,6 @@ function installRemoteHeaderRules() {
       condition: {
         initiatorDomains: [chrome.runtime.id],
         requestDomains: ["movie.douban.com", "book.douban.com", "music.douban.com"],
-        resourceTypes: ["xmlhttprequest"]
-      }
-    }, {
-      id: DOUBAN_IMAGE_HEADER_RULE_ID,
-      priority: 1,
-      action: {
-        type: "modifyHeaders",
-        requestHeaders: [
-          { header: "Referer", operation: "set", value: "https://www.douban.com/" },
-          { header: "Origin", operation: "remove" }
-        ]
-      },
-      condition: {
-        initiatorDomains: [chrome.runtime.id],
-        requestDomains: ["doubanio.com"],
         resourceTypes: ["xmlhttprequest"]
       }
     }]

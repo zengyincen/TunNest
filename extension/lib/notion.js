@@ -1,3 +1,5 @@
+import { PRODUCT } from "../config.js";
+
 const VERSION = "2022-06-28";
 const FILE_VERSION = "2026-03-11";
 const MANAGED_IMAGE_CAPTION = "TunNest · ";
@@ -27,7 +29,7 @@ export const NOTION_DATABASE_SCHEMAS = {
   douban: {
     label: "豆瓣用户收藏", title: "囤囤 · 豆瓣用户", icon: "👤",
     properties: {
-      "名称": { title: {} }, "封面": { files: {} }, "类型": { select: {} }, "原条目": { url: {} },
+      "名称": { title: {} }, "封面": { files: {} }, "封面原图": { url: {} }, "类型": { select: {} }, "原条目": { url: {} },
       "主创": { rich_text: {} }, "状态": { select: {} }, "评分": { number: {} },
       "短评": { rich_text: {} }, "标签": { multi_select: {} },
       "收藏时间": { date: {} }, "外部 ID": { rich_text: {} }
@@ -35,15 +37,15 @@ export const NOTION_DATABASE_SCHEMAS = {
   },
   doubanMovieTop250: {
     label: "豆瓣电影 Top 250", title: "囤囤 · 豆瓣电影 Top 250", icon: "🎞️",
-    properties: top250Properties()
+    properties: movieTop250Properties()
   },
   doubanBookTop250: {
     label: "豆瓣图书 Top 250", title: "囤囤 · 豆瓣图书 Top 250", icon: "📚",
-    properties: top250Properties()
+    properties: bookTop250Properties()
   },
   doubanMusicTop250: {
     label: "豆瓣音乐 Top 250", title: "囤囤 · 豆瓣音乐 Top 250", icon: "🎵",
-    properties: top250Properties()
+    properties: musicTop250Properties()
   },
   weibo: {
     label: "微博博文", title: "囤囤 · 微博博文", icon: "📰",
@@ -122,28 +124,21 @@ async function upsertItem(token, databaseId, item, source, context = {}) {
     const query = await notion(token, `/databases/${databaseId}/query`, withSignal({ method: "POST", body: JSON.stringify({ filter: { property: "外部 ID", rich_text: { equals: externalId } }, page_size: 1 }) }, signal));
     existingPage = query.results?.[0];
   }
-  if (existingPage && isTop250Source(source) && hasNotionHostedCover(existingPage) && top250Unchanged(existingPage, item, externalId)) {
+  const properties = propertiesFor(item, externalId, source);
+  if (existingPage && isTop250Source(source) && coverAlreadyAccelerated(existingPage) && propertiesUnchanged(existingPage.properties, properties)) {
     await onDetail("内容未变化，已跳过写入");
     return existingPage.id;
   }
-  const properties = propertiesFor(item, externalId, source);
   let cover = pageCover(item), version = VERSION;
   if (isDoubanSource(source) && isDoubanImageUrl(representativeImageUrl(item))) {
     if (hasNotionHostedCover(existingPage)) {
       delete properties["封面"];
       cover = null;
     } else {
-      try {
-        await onDetail("正在上传豆瓣封面");
-        const fileUploadId = await uploadImage(token, representativeImageUrl(item), 0, signal, (detail) => onDetail(`豆瓣封面 · ${detail}`), "douban");
-        properties["封面"] = uploadedImageFiles(fileUploadId);
-        cover = uploadedPageCover(fileUploadId);
-        version = FILE_VERSION;
-      } catch (error) {
-        if (signal?.aborted) throw error;
-        console.warn("豆瓣封面上传失败，保留原图链接", error);
-        await onDetail("封面上传失败，保留原图链接");
-      }
+      const acceleratedUrl = doubanProxyUrl(representativeImageUrl(item));
+      properties["封面"] = imageFilesForUrl(acceleratedUrl);
+      cover = pageCoverForUrl(acceleratedUrl);
+      await onDetail("已使用加速封面直链");
     }
   }
   if (existingPage) {
@@ -202,18 +197,35 @@ function propertiesFor(item, externalId, source) {
     "同步时间": date(item.capturedAt), "外部 ID": { rich_text: rich(externalId, 1900) }
   };
   if (source === "douban") return {
-    "名称": { title: rich(item.title, 1900) }, "封面": cover, "类型": { select: { name: kindLabel(item.kind) } },
+    "名称": { title: rich(item.title, 1900) }, "封面": cover, "封面原图": { url: representativeImageUrl(item) || null }, "类型": { select: { name: kindLabel(item.kind) } },
     "原条目": { url: item.url || null }, "主创": { rich_text: rich(item.author || "", 1900) },
     "状态": { select: { name: doubanStatus(metadata.status, item.kind) } }, "评分": number(metadata.rating),
     "短评": { rich_text: rich(item.excerpt || "", 1900) }, "标签": tags,
     "收藏时间": date(item.capturedAt), "外部 ID": { rich_text: rich(externalId, 1900) }
   };
-  if (["doubanMovieTop250", "doubanBookTop250", "doubanMusicTop250"].includes(source)) return {
-    "名称": { title: rich(item.title, 1900) }, "封面": cover,
+  const topBase = {
+    "名称": { title: rich(item.title, 1900) }, "封面": cover, "封面原图": { url: representativeImageUrl(item) || null },
     "排名": number(metadata.rank), "评分": number(metadata.rating), "评价人数": number(metadata.ratingCount),
-    "信息": { rich_text: rich(metadata.info || item.author || "", 1900) },
+  };
+  const topTail = {
     "推荐语": { rich_text: rich(metadata.quote || "", 1900) }, "原条目": { url: item.url || null },
     "标签": tags, "抓取时间": date(item.capturedAt), "外部 ID": { rich_text: rich(externalId, 1900) }
+  };
+  if (source === "doubanMovieTop250") return {
+    ...topBase, "导演": { rich_text: rich(metadata.director || "", 1900) }, "主演": { rich_text: rich(metadata.cast || "", 1900) },
+    "年份": { rich_text: rich(metadata.years || "", 1900) }, "国家/地区": { rich_text: rich(metadata.region || "", 1900) },
+    "类型": { multi_select: (metadata.genres || []).slice(0, 20).map((name) => ({ name: String(name).slice(0, 100) })) }, ...topTail
+  };
+  if (source === "doubanBookTop250") return {
+    ...topBase, "作者": { rich_text: rich(metadata.author || "", 1900) }, "译者": { rich_text: rich(metadata.translators || "", 1900) },
+    "出版社": { rich_text: rich(metadata.publisher || "", 1900) }, "出版日期": { rich_text: rich(metadata.publicationDate || "", 1900) },
+    "定价": { rich_text: rich(metadata.price || "", 1900) }, ...topTail
+  };
+  if (source === "doubanMusicTop250") return {
+    ...topBase, "艺术家": { rich_text: rich(metadata.artist || "", 1900) }, "发行日期": { rich_text: rich(metadata.releaseDate || "", 1900) },
+    "版本类型": { select: metadata.releaseType ? { name: String(metadata.releaseType).slice(0, 100) } : null },
+    "介质": { select: metadata.medium ? { name: String(metadata.medium).slice(0, 100) } : null },
+    "流派": { multi_select: (metadata.genres || []).slice(0, 20).map((name) => ({ name: String(name).slice(0, 100) })) }, ...topTail
   };
   return {
     "博文": { title: rich(item.title, 1900) }, "封面": cover, "用户": { rich_text: rich(item.author || "", 1900) },
@@ -372,31 +384,36 @@ function imageExtension(type, pathname) { return ({ "image/jpeg": "jpg", "image/
 function normalizeImageType(value) { const type = String(value || "").split(";", 1)[0].toLowerCase(); return type === "image/jpg" ? "image/jpeg" : type.startsWith("image/") ? type : ""; }
 function imageTypeFromPath(pathname) { return ({ jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", gif: "image/gif", webp: "image/webp", avif: "image/avif" })[pathname.match(/\.([a-z0-9]+)$/i)?.[1]?.toLowerCase()] || ""; }
 function imageFallbackBlock(image) { return { object: "block", type: "paragraph", paragraph: { rich_text: [{ type: "text", text: { content: `${MANAGED_IMAGE_CAPTION}配图上传失败 · ${image.caption}（打开原图）`, link: { url: image.url } } }] } }; }
-function top250Properties() { return { "名称": { title: {} }, "封面": { files: {} }, "排名": { number: {} }, "评分": { number: {} }, "评价人数": { number: {} }, "信息": { rich_text: {} }, "推荐语": { rich_text: {} }, "原条目": { url: {} }, "标签": { multi_select: {} }, "抓取时间": { date: {} }, "外部 ID": { rich_text: {} } }; }
+function top250BaseProperties() { return { "名称": { title: {} }, "封面": { files: {} }, "封面原图": { url: {} }, "排名": { number: {} }, "评分": { number: {} }, "评价人数": { number: {} } }; }
+function top250TailProperties() { return { "推荐语": { rich_text: {} }, "原条目": { url: {} }, "标签": { multi_select: {} }, "抓取时间": { date: {} }, "外部 ID": { rich_text: {} } }; }
+function movieTop250Properties() { return { ...top250BaseProperties(), "导演": { rich_text: {} }, "主演": { rich_text: {} }, "年份": { rich_text: {} }, "国家/地区": { rich_text: {} }, "类型": { multi_select: {} }, ...top250TailProperties() }; }
+function bookTop250Properties() { return { ...top250BaseProperties(), "作者": { rich_text: {} }, "译者": { rich_text: {} }, "出版社": { rich_text: {} }, "出版日期": { rich_text: {} }, "定价": { rich_text: {} }, ...top250TailProperties() }; }
+function musicTop250Properties() { return { ...top250BaseProperties(), "艺术家": { rich_text: {} }, "发行日期": { rich_text: {} }, "版本类型": { select: {} }, "介质": { select: {} }, "流派": { multi_select: {} }, ...top250TailProperties() }; }
 function representativeImageUrl(item) { const image=(item.images||[])[0],value=typeof image==="string"?image:image?.url;return normalizeImageUrl(item.coverUrl||value); }
 function isDoubanImageUrl(value) { try { return /(^|\.)doubanio\.com$/i.test(new URL(value).hostname); } catch { return false; } }
 function hasNotionHostedCover(page) { return (page?.properties?.["封面"]?.files || []).some((file) => file.type === "file" || file.type === "file_upload"); }
-function uploadedPageCover(id) { return { type: "file_upload", file_upload: { id } }; }
-function uploadedImageFiles(id) { return { files: [{ name: "封面", type: "file_upload", file_upload: { id } }] }; }
-function top250Unchanged(page, item, externalId) {
-  const properties = page?.properties || {}, metadata = item.metadata || {};
-  return propertyText(properties["名称"]) === String(item.title || "").slice(0, 1900)
-    && propertyNumber(properties["排名"]) === nullableNumber(metadata.rank)
-    && propertyNumber(properties["评分"]) === nullableNumber(metadata.rating)
-    && propertyNumber(properties["评价人数"]) === nullableNumber(metadata.ratingCount)
-    && propertyText(properties["信息"]) === String(metadata.info || item.author || "").slice(0, 1900)
-    && propertyText(properties["推荐语"]) === String(metadata.quote || "").slice(0, 1900)
-    && (properties["原条目"]?.url || "") === String(item.url || "")
-    && propertyText(properties["外部 ID"]) === externalId
-    && sameStrings((properties["标签"]?.multi_select || []).map((tag) => tag.name), (item.tags || []).slice(0, 20).map((tag) => String(tag).slice(0, 100)));
+function coverAlreadyAccelerated(page) { const file = page?.properties?.["封面"]?.files?.[0]; return hasNotionHostedCover(page) || file?.type === "external" && String(file.external?.url || "").startsWith(`${imageProxyBase()}/v1/images/douban?`); }
+function propertiesUnchanged(actual = {}, desired = {}) { return Object.entries(desired).filter(([name]) => !["封面", "抓取时间"].includes(name)).every(([name, value]) => propertyUnchanged(actual[name], value)); }
+function propertyUnchanged(actual, desired) {
+  if ("title" in desired) return propertyText(actual) === desiredText(desired.title);
+  if ("rich_text" in desired) return propertyText(actual) === desiredText(desired.rich_text);
+  if ("number" in desired) return propertyNumber(actual) === desired.number;
+  if ("url" in desired) return (actual?.url || null) === desired.url;
+  if ("select" in desired) return (actual?.select?.name || null) === (desired.select?.name || null);
+  if ("multi_select" in desired) return sameStrings((actual?.multi_select || []).map((option) => option.name), desired.multi_select.map((option) => option.name));
+  return false;
 }
 function propertyText(property) { return (property?.title || property?.rich_text || []).map((part) => part.plain_text ?? part.text?.content ?? "").join(""); }
+function desiredText(parts) { return (parts || []).map((part) => part.text?.content || "").join(""); }
 function propertyNumber(property) { return property?.number === null || property?.number === undefined ? null : Number(property.number); }
-function nullableNumber(value) { const parsed = Number(value); return value === null || value === undefined || value === "" || !Number.isFinite(parsed) ? null : parsed; }
 function sameStrings(left, right) { const a = [...left].sort(), b = [...right].sort(); return a.length === b.length && a.every((value, index) => value === b[index]); }
 function normalizeImageUrl(value) { const normalized=String(value||"").trim().replace(/^http:/i,"https:").replace(/^\/\//,"https://");if(!normalized)return "";try{const url=new URL(normalized);return url.protocol==="https:"&&url.href.length<=2000?url.href:"";}catch{return "";} }
 function pageCover(item) { const url=representativeImageUrl(item);return url?{type:"external",external:{url}}:null; }
 function imageFiles(item) { const url=representativeImageUrl(item);return{files:url?[{name:"封面",type:"external",external:{url}}]:[]}; }
+function pageCoverForUrl(url) { return url ? { type: "external", external: { url } } : null; }
+function imageFilesForUrl(url) { return { files: url ? [{ name: "封面", type: "external", external: { url } }] : [] }; }
+function imageProxyBase() { const envBase = typeof process !== "undefined" ? process.env?.LICENSE_API_BASE : ""; return String(envBase || PRODUCT.licenseApiBase).replace(/\/$/, ""); }
+function doubanProxyUrl(url) { return `${imageProxyBase()}/v1/images/douban?url=${encodeURIComponent(url)}`; }
 function ensureDatabaseSchema(token, databaseId, source, signal) {
   const schema=sourceSchema(source),key=`${databaseId}:${source}`;
   if(ensuredDatabaseSchemas.has(key))return ensuredDatabaseSchemas.get(key);
