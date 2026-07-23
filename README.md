@@ -273,51 +273,6 @@ GitHub Actions 无法复用浏览器登录，因此自动同步微信读书时 `
 
 GitHub Actions 属于持续无人值守服务，不提供试用，必须使用有效付费许可证。
 
-### 配置 GitHub 发码权限
-
-在仓库进入 `Settings → Secrets and variables → Actions`。
-
-在 **Variables** 中添加：
-
-| 名称 | 值 |
-|---|---|
-| `LICENSE_API_BASE` | Worker 地址，例如 `https://license.example.com`，末尾不要加 `/` |
-
-在 **Secrets** 中添加：
-
-| 名称 | 值 |
-|---|---|
-| `LICENSE_ADMIN_TOKEN` | 与 Cloudflare Worker `ADMIN_TOKEN` 完全相同的管理员密钥 |
-
-Repository Secret 名称区分大小写，值前后不要添加引号、空格或 Markdown 链接格式。
-
-### 通过 GitHub Actions 签发许可证
-
-1. 打开仓库的 `Actions` 页面。
-2. 选择 `Issue TunNest subscription license`。
-3. 点击 `Run workflow`。
-4. 填写 `customer_id`，建议使用订单号或客户编号。
-5. 选择 `monthly`、`halfyear`、`yearly` 或 `lifetime`。
-6. `note` 可填写内部备注。
-7. 等待工作流完成，下载 `license-客户-套餐` Artifact。
-8. 解压并打开 `license.txt`，把 `tunnest_…` 许可证安全发送给客户。
-
-Artifact 默认保留 7 天，许可证不会明文打印在 Actions 日志里。日志中的 `lic_…` 是后台许可证记录 ID，可用于暂停、延期和清理设备；它不是客户激活码。
-
-### 本地签发许可证
-
-也可以直接运行工具：
-
-```bash
-export LICENSE_API_BASE="https://license.example.com"
-export LICENSE_ADMIN_TOKEN="你的管理员密钥"
-export CUSTOMER_ID="订单号或客户编号"
-export PLAN="lifetime"
-export NOTE="可选备注"
-node tools/issue-license.mjs
-```
-
-成功后会在项目根目录生成权限为 `0600` 的 `license.txt`。使用完成后妥善转移并删除本地明文文件。
 
 ### 激活和释放设备
 
