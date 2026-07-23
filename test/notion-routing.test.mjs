@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { readFileSync } from "node:fs";
-import { NOTION_DATABASE_SCHEMAS, syncItems, verifyNotion } from "../extension/lib/notion.js";
+import { NOTION_DATABASE_SCHEMAS, contentFingerprint, syncItems, verifyNotion } from "../extension/lib/notion.js";
 
 const background=readFileSync(new URL("../extension/background.js",import.meta.url),"utf8");
 const options=readFileSync(new URL("../extension/options.html",import.meta.url),"utf8");
@@ -11,16 +11,17 @@ const databaseData=(source,id="a".repeat(32))=>({id,title:[],properties:Object.f
 
 test("defines independent Notion schemas including four Douban databases",()=>{
   assert.deepEqual(Object.keys(NOTION_DATABASE_SCHEMAS),["clip","weread","douban","doubanMovieTop250","doubanBookTop250","doubanMusicTop250","weibo"]);
-  assert.deepEqual(Object.keys(NOTION_DATABASE_SCHEMAS.clip.properties),["标题","封面","类型","原文","作者","摘要","标签","收藏时间","外部 ID"]);
-  assert.deepEqual(Object.keys(NOTION_DATABASE_SCHEMAS.weread.properties),["书名","封面","作者","原书链接","划线数量","同步摘要","标签","同步时间","外部 ID"]);
-  assert.deepEqual(Object.keys(NOTION_DATABASE_SCHEMAS.douban.properties),["名称","封面","封面原图","类型","原条目","主创","状态","评分","短评","标签","收藏时间","外部 ID"]);
-  assert.deepEqual(Object.keys(NOTION_DATABASE_SCHEMAS.doubanMovieTop250.properties),["名称","封面","封面原图","排名","评分","评价人数","导演","主演","年份","国家/地区","类型","推荐语","原条目","标签","抓取时间","外部 ID"]);
-  assert.deepEqual(Object.keys(NOTION_DATABASE_SCHEMAS.doubanBookTop250.properties),["名称","封面","封面原图","排名","评分","评价人数","作者","译者","出版社","出版日期","定价","推荐语","原条目","标签","抓取时间","外部 ID"]);
-  assert.deepEqual(Object.keys(NOTION_DATABASE_SCHEMAS.doubanMusicTop250.properties),["名称","封面","封面原图","排名","评分","评价人数","艺术家","发行日期","版本类型","介质","流派","推荐语","原条目","标签","抓取时间","外部 ID"]);
-  assert.deepEqual(Object.keys(NOTION_DATABASE_SCHEMAS.weibo.properties),["博文","封面","用户","原博文","正文摘要","转发数","评论数","点赞数","标签","发布时间","外部 ID"]);
+  assert.deepEqual(Object.keys(NOTION_DATABASE_SCHEMAS.clip.properties),["标题","封面","类型","原文","作者","摘要","标签","收藏时间","外部 ID","内容指纹"]);
+  assert.deepEqual(Object.keys(NOTION_DATABASE_SCHEMAS.weread.properties),["书名","封面","作者","原书链接","划线数量","同步摘要","标签","同步时间","外部 ID","内容指纹"]);
+  assert.deepEqual(Object.keys(NOTION_DATABASE_SCHEMAS.douban.properties),["名称","封面","封面原图","类型","原条目","主创","状态","评分","短评","标签","收藏时间","外部 ID","内容指纹"]);
+  assert.deepEqual(Object.keys(NOTION_DATABASE_SCHEMAS.doubanMovieTop250.properties),["名称","封面","封面原图","排名","评分","评价人数","导演","主演","年份","国家/地区","类型","推荐语","原条目","标签","抓取时间","外部 ID","内容指纹"]);
+  assert.deepEqual(Object.keys(NOTION_DATABASE_SCHEMAS.doubanBookTop250.properties),["名称","封面","封面原图","排名","评分","评价人数","作者","译者","出版社","出版日期","定价","推荐语","原条目","标签","抓取时间","外部 ID","内容指纹"]);
+  assert.deepEqual(Object.keys(NOTION_DATABASE_SCHEMAS.doubanMusicTop250.properties),["名称","封面","封面原图","排名","评分","评价人数","艺术家","发行日期","版本类型","介质","流派","推荐语","原条目","标签","抓取时间","外部 ID","内容指纹"]);
+  assert.deepEqual(Object.keys(NOTION_DATABASE_SCHEMAS.weibo.properties),["博文","封面","用户","原博文","正文摘要","转发数","评论数","点赞数","标签","发布时间","外部 ID","内容指纹"]);
   for(const schema of Object.values(NOTION_DATABASE_SCHEMAS)){
     assert.equal(Object.values(schema.properties).filter(value=>"title" in value).length,1);
     assert.deepEqual(schema.properties["外部 ID"],{rich_text:{}});
+    assert.deepEqual(schema.properties["内容指纹"],{rich_text:{}});
     assert.deepEqual(schema.properties["封面"],{files:{}});
   }
 });
@@ -152,14 +153,15 @@ test("batch-checks existing records and skips unchanged Top 250 writes",async()=
     tags:["豆瓣","音乐 Top 250"],capturedAt:"2026-07-23T00:00:00Z",
     metadata:{rank:index + 1,rating:9.1,ratingCount:1000 + index,artist:`歌手 ${index + 1}`,releaseDate:"2026-01-01",releaseType:"专辑",medium:"CD",genres:["流行"],quote:"推荐语"}
   }));
-  const pages=items.map((item)=>({id:`page-${item.externalId}`,properties:{
+  const pages=await Promise.all(items.map(async(item)=>({id:`page-${item.externalId}`,properties:{
     "名称":{title:[{plain_text:item.title}]},"封面":{files:[{type:"file",file:{url:"https://notion.example/cover.jpg"}}]},"封面原图":{url:item.coverUrl},
     "排名":{number:item.metadata.rank},"评分":{number:item.metadata.rating},"评价人数":{number:item.metadata.ratingCount},
     "艺术家":{rich_text:[{plain_text:item.metadata.artist}]},"发行日期":{rich_text:[{plain_text:item.metadata.releaseDate}]},
     "版本类型":{select:{name:item.metadata.releaseType}},"介质":{select:{name:item.metadata.medium}},"流派":{multi_select:item.metadata.genres.map((name)=>({name}))},
     "推荐语":{rich_text:[{plain_text:item.metadata.quote}]},
-    "原条目":{url:item.url},"标签":{multi_select:item.tags.map((name)=>({name}))},"外部 ID":{rich_text:[{plain_text:item.externalId}]}
-  }}));
+    "原条目":{url:item.url},"标签":{multi_select:item.tags.map((name)=>({name}))},"外部 ID":{rich_text:[{plain_text:item.externalId}]},
+    "内容指纹":{rich_text:[{plain_text:await contentFingerprint(item,"doubanMusicTop250")}]}
+  }})));
   globalThis.fetch=async(url,init={})=>{
     calls.push({url:String(url),init});
     const value=String(url);
@@ -195,6 +197,59 @@ test("uses batch duplicate checks for multi-item WeRead synchronization",async()
   }finally{globalThis.fetch=previousFetch;}
 });
 
+test("skips an unchanged item by content fingerprint even when the sync timestamp changes",async()=>{
+  const previousFetch=globalThis.fetch,calls=[],databaseId="9".repeat(32);
+  const original={kind:"book",externalId:"book-stable",title:"稳定内容",author:"作者",url:"https://weread.qq.com/web/bookDetail/stable",excerpt:"摘要",highlights:[{chapter:"一",text:"划线",note:"笔记"}],tags:["微信读书"],capturedAt:"2026-07-22T00:00:00Z"};
+  const next={...original,capturedAt:"2026-07-23T00:00:00Z"};
+  const fingerprint=await contentFingerprint(original,"weread");
+  assert.equal(await contentFingerprint(next,"weread"),fingerprint);
+  globalThis.fetch=async(url,init={})=>{
+    calls.push({url:String(url),init});
+    const value=String(url),data=value.endsWith("/query")?{results:[{id:"stable-page",properties:{"内容指纹":{rich_text:[{plain_text:fingerprint}]}}}]}:value.includes("/databases/")&&init.method!=="PATCH"?databaseData("weread",databaseId):{};
+    return{ok:true,status:200,json:async()=>data};
+  };
+  try{
+    const result=await syncItems("token",databaseId,[next],"weread");
+    assert.equal(result[0].ok,true);
+    assert.equal(calls.some((call)=>call.url.endsWith("/pages/stable-page")),false);
+    assert.equal(calls.some((call)=>call.url.includes("/blocks/stable-page")),false);
+  }finally{globalThis.fetch=previousFetch;}
+});
+
+test("changes the content fingerprint for notes, images, and interaction data",async()=>{
+  const base={kind:"post",externalId:"post-fingerprint",title:"微博",content:"正文",images:["https://wx1.sinaimg.cn/large/a.jpg"],highlights:[],tags:["微博"],metadata:{attitudes:1}};
+  const fingerprint=await contentFingerprint(base,"weibo");
+  assert.notEqual(await contentFingerprint({...base,content:"更新正文"},"weibo"),fingerprint);
+  assert.notEqual(await contentFingerprint({...base,images:["https://wx1.sinaimg.cn/large/b.jpg"]},"weibo"),fingerprint);
+  assert.notEqual(await contentFingerprint({...base,metadata:{attitudes:2}},"weibo"),fingerprint);
+  const book={kind:"book",externalId:"book-note",title:"书",highlights:[{text:"划线",note:"旧笔记"}]};
+  assert.notEqual(await contentFingerprint(book,"weread"),await contentFingerprint({...book,highlights:[{text:"划线",note:"新笔记"}]},"weread"));
+});
+
+test("updates properties and managed body when an existing item changes",async()=>{
+  const previousFetch=globalThis.fetch,calls=[],databaseId="0".repeat(32);
+  const oldItem={kind:"article",externalId:"changed-page",title:"文章",url:"https://example.com/changed",content:"旧正文",tags:[]};
+  const newItem={...oldItem,content:"新正文"};
+  const oldFingerprint=await contentFingerprint(oldItem,"clip");
+  globalThis.fetch=async(url,init={})=>{
+    calls.push({url:String(url),init});
+    const value=String(url);let data={};
+    if(value.endsWith("/query"))data={results:[{id:"changed-notion-page",properties:{"内容指纹":{rich_text:[{plain_text:oldFingerprint}]}}}]};
+    else if(value.includes("/databases/")&&init.method!=="PATCH")data=databaseData("clip",databaseId);
+    else if(value.includes("/blocks/changed-notion-page/children")&&init.method!=="PATCH")data={results:[]};
+    return{ok:true,status:200,json:async()=>data};
+  };
+  try{
+    const result=await syncItems("token",databaseId,[newItem],"clip");
+    assert.equal(result[0].ok,true);
+    const pageUpdate=calls.find((call)=>call.url.endsWith("/pages/changed-notion-page")&&call.init.method==="PATCH");
+    assert.ok(pageUpdate);
+    assert.equal(JSON.parse(pageUpdate.init.body).properties["内容指纹"].rich_text[0].text.content,await contentFingerprint(newItem,"clip"));
+    const bodyUpdate=calls.find((call)=>call.url.endsWith("/blocks/changed-notion-page/children")&&call.init.method==="PATCH");
+    assert.match(bodyUpdate.init.body,/新正文/);
+  }finally{globalThis.fetch=previousFetch;}
+});
+
 test("adds the shared image property to an existing database",async()=>{
   const previousFetch=globalThis.fetch,calls=[];
   const properties=Object.fromEntries(Object.entries(NOTION_DATABASE_SCHEMAS.weread.properties).filter(([name])=>name!=="封面").map(([name,definition])=>[name,{type:Object.keys(definition)[0]}]));
@@ -215,7 +270,7 @@ test("renames the title and creates every missing property automatically",async(
     assert.equal(result.id,databaseId);
     const patches=calls.filter(call=>call.init.method==="PATCH").map(call=>JSON.parse(call.init.body).properties);
     assert.deepEqual(patches[0],{Name:{name:"书名"}});
-    assert.deepEqual(Object.keys(patches[1]),["封面","作者","原书链接","划线数量","同步摘要","标签","同步时间","外部 ID"]);
+    assert.deepEqual(Object.keys(patches[1]),["封面","作者","原书链接","划线数量","同步摘要","标签","同步时间","外部 ID","内容指纹"]);
     assert.deepEqual(patches[1]["封面"],{files:{}});
     assert.deepEqual(patches[1]["外部 ID"],{rich_text:{}});
   }finally{globalThis.fetch=previousFetch;}

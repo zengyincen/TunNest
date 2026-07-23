@@ -10,6 +10,8 @@
 4. 对每个来源填写父页面链接并点击“创建或连接”；豆瓣卡片需使用同一父页面依次连接四个数据库。留空数据库 ID 时，扩展按下表自动建库。
 5. 如果连接已有数据库，扩展会自动重命名标题列并创建下表中缺失的属性；若同名属性已经存在但类型错误，为避免数据损坏，需要先在 Notion 中手动改名或删除该冲突属性。
 
+“内容指纹”由 TunNest 自动维护。旧记录升级后第一次同步会补写该字段，此后内容未变化就跳过 Notion 页面与正文写入；“收藏时间 / 同步时间 / 抓取时间”变化本身不会触发更新。
+
 ## 网页剪藏数据库
 
 默认名称：`囤囤 · 网页剪藏`
@@ -25,6 +27,7 @@
 | 标签 | 多选（Multi-select） | 来源与自定义标签 |
 | 收藏时间 | 日期（Date） | 剪藏时间 |
 | 外部 ID | 文本（Rich text） | 去重键，不能改成“唯一 ID”类型 |
+| 内容指纹 | 文本（Rich text） | 内容未变化时跳过 Notion 写入 |
 
 ## 微信读书数据库
 
@@ -41,6 +44,7 @@
 | 标签 | 多选（Multi-select） | 微信读书等标签 |
 | 同步时间 | 日期（Date） | 最近同步时间 |
 | 外部 ID | 文本（Rich text） | 微信读书 Book ID 去重键 |
+| 内容指纹 | 文本（Rich text） | 划线、笔记或书籍信息的内容摘要 |
 
 书籍图片会同时写入“封面”文件属性并设置为 Notion 页面封面。已有数据库缺少该属性时，扩展会在连接或下次同步时自动创建。
 
@@ -62,6 +66,7 @@
 | 标签 | 多选（Multi-select） | 用户标签与题材 |
 | 收藏时间 | 日期（Date） | 豆瓣标记时间 |
 | 外部 ID | 文本（Rich text） | 豆瓣 Subject ID 去重键 |
+| 内容指纹 | 文本（Rich text） | 收藏内容未变化时跳过写入 |
 
 ## 豆瓣 Top 250 数据库
 
@@ -80,6 +85,7 @@
 | 标签 | 多选（Multi-select） | 豆瓣与榜单类型 |
 | 抓取时间 | 日期（Date） | 本次榜单更新时间 |
 | 外部 ID | 文本（Rich text） | Subject ID 去重键 |
+| 内容指纹 | 文本（Rich text） | 排名、评分或资料变化时才更新 |
 
 三套榜单的专属属性：
 
@@ -90,6 +96,14 @@
 | 音乐 Top 250 | 艺术家（文本）、发行日期（文本）、版本类型（选择）、介质（选择）、流派（多选） |
 
 封面使用许可证 Worker 的缓存代理直链写入，豆瓣原始地址保存在“封面原图”。图片不逐张上传到 Notion，也不写入 D1 或对象存储。
+
+### 可选 TMDB 电影海报
+
+在 [TMDB](https://www.themoviedb.org/) 的 `Settings → API` 申请个人非商业访问，复制 `API Read Access Token`。然后在扩展的“电影封面来源”选择 `TMDB 优先，豆瓣兜底` 或 `豆瓣优先，TMDB 兜底`，填写 Token 并保存。
+
+TunNest 只接受片名完全一致且年份一致的结果；没有可靠匹配就保留豆瓣封面。Token 仅保存在本机，匹配结果缓存 30 天。GitHub Actions 需要额外创建 Variable `MOVIE_COVER_PROVIDER=tmdb-first`（或 `tmdb-fallback`）和 Secret `TMDB_ACCESS_TOKEN`。TMDB 要求署名，且开发者 API 不适用于收费服务；对外商业使用前必须取得 TMDB 商业授权。
+
+This product uses the TMDB API but is not endorsed or certified by TMDB.
 
 豆瓣过去提供过官方开放 API v2，但开放平台和新应用申请入口已经下线。当前 Frodo 适配属于内部接口兼容层，可能随时失效，不代表豆瓣官方授权；商业发布应优先采用用户主动导入、浏览器端本人数据同步或取得书面授权。
 
@@ -110,6 +124,7 @@
 | 标签 | 多选（Multi-select） | 微博等标签 |
 | 发布时间 | 日期（Date） | 博文发布时间 |
 | 外部 ID | 文本（Rich text） | 微博 Post ID 去重键 |
+| 内容指纹 | 文本（Rich text） | 正文、配图或互动数据变化时才更新 |
 
 ## 来源账号
 
@@ -119,7 +134,7 @@
 
 微博配图会先由扩展下载原图并上传到用户自己的 Notion 文件空间；第一张成功上传的图片同时写入“封面”文件属性。若下载失败，再让 Notion 尝试远程导入。只有新图片成功附加后才会清理旧同步块；两种上传都失败时保留可点击的原图链接和明确错误。该流程不经过 TunNest、Cloudflare 或第三方对象存储。单张图片受 Notion File Upload API 的 20MB 限制。
 
-Notion Token 保存于本机 `chrome.storage.local`，不会使用 Chrome Sync。公共电脑不应保存 Token。
+Notion Token 和可选的 TMDB Token 保存于本机 `chrome.storage.local`，不会使用 Chrome Sync。公共电脑不应保存 Token。
 
 ## 从旧版单数据库迁移
 

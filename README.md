@@ -6,7 +6,7 @@
 
   <p>
     <a href="https://github.com/zengyincen/TunNest/actions/workflows/ci.yml"><img src="https://github.com/zengyincen/TunNest/actions/workflows/ci.yml/badge.svg" alt="TunNest CI"></a>
-    <img src="https://img.shields.io/badge/release-v1.4.0-1D1D1F?style=flat-square" alt="Release v1.4.0">
+    <img src="https://img.shields.io/badge/release-v1.4.1-1D1D1F?style=flat-square" alt="Release v1.4.1">
     <img src="https://img.shields.io/badge/Chrome-Manifest_V3-4285F4?style=flat-square&logo=googlechrome&logoColor=white" alt="Chrome Manifest V3">
     <img src="https://img.shields.io/badge/同步来源-4-30D158?style=flat-square" alt="4 个同步来源">
     <img src="https://img.shields.io/badge/完整试用-7_天-FF9F0A?style=flat-square" alt="7 天完整试用">
@@ -135,6 +135,8 @@ Token 相当于进入数据库的钥匙，不要提交到 GitHub 源码，也不
 > [!WARNING]
 > 七个数据库里的“外部 ID”必须是普通“文本 / Rich text”属性，不能使用 Notion 的“唯一 ID / Unique ID”属性。它是 TunNest 更新和去重的关键字段。
 
+“内容指纹”同样由扩展自动维护，请不要手动编辑。升级后旧记录会在第一次同步时补写一次指纹；之后只有正文、划线、笔记、封面、评分、排名、配图或互动数据等实际内容变化才更新，单纯同步时间变化不会反复改写页面。
+
 ### 网页剪藏数据库
 
 默认数据库名：`囤囤 · 网页剪藏`
@@ -150,6 +152,7 @@ Token 相当于进入数据库的钥匙，不要提交到 GitHub 源码，也不
 | 标签 | 多选（Multi-select） | 来源与标签 |
 | 收藏时间 | 日期（Date） | 剪藏时间 |
 | 外部 ID | 文本（Rich text） | URL 去重键 |
+| 内容指纹 | 文本（Rich text） | 内容未变化时跳过 Notion 写入 |
 
 ### 微信读书数据库
 
@@ -166,6 +169,7 @@ Token 相当于进入数据库的钥匙，不要提交到 GitHub 源码，也不
 | 标签 | 多选（Multi-select） | 来源和自定义标签 |
 | 同步时间 | 日期（Date） | 最近同步时间 |
 | 外部 ID | 文本（Rich text） | Book ID 去重键 |
+| 内容指纹 | 文本（Rich text） | 划线、笔记或书籍信息的内容摘要 |
 
 书籍图片会同时写入“封面”属性和 Notion 页面封面。
 
@@ -187,6 +191,7 @@ Token 相当于进入数据库的钥匙，不要提交到 GitHub 源码，也不
 | 标签 | 多选（Multi-select） | 用户标签和题材 |
 | 收藏时间 | 日期（Date） | 豆瓣标记时间 |
 | 外部 ID | 文本（Rich text） | Subject ID 去重键 |
+| 内容指纹 | 文本（Rich text） | 收藏内容未变化时跳过写入 |
 
 ### 豆瓣电影 / 图书 / 音乐 Top 250 数据库
 
@@ -211,6 +216,7 @@ Token 相当于进入数据库的钥匙，不要提交到 GitHub 源码，也不
 | 标签 | 多选（Multi-select） | 豆瓣及榜单类型 |
 | 抓取时间 | 日期（Date） | 本次榜单更新时间 |
 | 外部 ID | 文本（Rich text） | Subject ID 去重键 |
+| 内容指纹 | 文本（Rich text） | 排名、评分或资料变化时才更新 |
 
 电影 Top 250 专属属性：
 
@@ -261,6 +267,7 @@ Token 相当于进入数据库的钥匙，不要提交到 GitHub 源码，也不
 | 标签 | 多选（Multi-select） | 来源和标签 |
 | 发布时间 | 日期（Date） | 博文发布时间 |
 | 外部 ID | 文本（Rich text） | Post ID 去重键 |
+| 内容指纹 | 文本（Rich text） | 正文、配图或互动数据变化时才更新 |
 
 微博原图会先由扩展下载，再上传到用户自己的 Notion 文件空间；第一张图片同时写入“封面”属性，全部图片写入页面正文。请在上传过程中保持浏览器运行。
 
@@ -303,6 +310,28 @@ GitHub Actions 无法复用浏览器登录，因此自动同步微信读书时 `
 从 `v1.2.14` 起，TunNest 会自动生成当前 Frodo 接口要求的时间戳与签名。旧版出现 `invalid_request_997` 时，请升级扩展并在 `chrome://extensions` 点击“重新加载”。
 
 豆瓣过去的公开 API 已停止面向新项目申请。当前适配属于实验性兼容层，可能因签名和风控变化失效，不代表豆瓣官方授权。
+
+#### 可选：使用 TMDB 电影海报
+
+TMDB 只用于电影，不替换图书和音乐封面。设置页提供三种模式：
+
+- `豆瓣缓存代理`：默认模式，不请求 TMDB；
+- `TMDB 优先，豆瓣兜底`：按中文片名和年份精确匹配，匹配成功后使用 `image.tmdb.org` 的 `w500` 海报；
+- `豆瓣优先，TMDB 兜底`：只有豆瓣没有有效封面时才请求 TMDB。
+
+配置方法：
+
+1. 注册并登录 [TMDB](https://www.themoviedb.org/)；
+2. 进入 `Settings → API`，申请个人非商业 API 访问；
+3. 复制 `API Read Access Token`，不要复制 Session ID；
+4. 在扩展设置中选择 TMDB 模式并粘贴 Token；
+5. 保存后重新同步豆瓣。
+
+Token 只保存在本机 `chrome.storage.local`，不会写进源码、扩展包或 Cloudflare。匹配映射缓存 30 天；标题或年份无法精确匹配时继续使用豆瓣封面，避免错配。TMDB 的开发者 API 仅允许符合其条款的非商业用途；如果未来将此实例对外收费或提供给他人使用，需要先与 TMDB 签订商业协议。
+
+<img src="extension/assets/tmdb.svg" alt="TMDB" width="120">
+
+This product uses the TMDB API but is not endorsed or certified by TMDB.
 
 ### 微博
 
@@ -387,6 +416,7 @@ curl -X PATCH "$LICENSE_API_BASE/v1/admin/licenses/lic_xxx" \
 | 名称 | 必填 | 示例 |
 |---|:---:|---|
 | `LICENSE_API_BASE` | ✅ | `https://license.example.com`，末尾不要加 `/` |
+| `MOVIE_COVER_PROVIDER` | 可选 | `douban`、`tmdb-first` 或 `tmdb-fallback`；默认 `douban` |
 
 ### 3. 配置 Secrets
 
@@ -404,9 +434,10 @@ curl -X PATCH "$LICENSE_API_BASE/v1/admin/licenses/lic_xxx" \
 | `NOTION_DOUBAN_MUSIC_TOP250_DATABASE_ID` | 豆瓣 | 音乐 Top 250 数据库 ID |
 | `DOUBAN_USER_ID` | 豆瓣 | `/people/` 后面的用户 ID |
 | `DOUBAN_AUTH_TOKEN` | 豆瓣，可选 | 仅非公开收藏需要 |
+| `TMDB_ACCESS_TOKEN` | TMDB 模式 | TMDB API Read Access Token；默认豆瓣模式无需配置 |
 | `LICENSE_ADMIN_TOKEN` | 仅发码 | 管理员密钥；每日同步本身不读取 |
 
-`DOUBAN_API_KEY` 从 `v1.2.14` 起不再需要，可以删除。旧版 `NOTION_DATABASE_ID` 只作为兼容回退，不建议新配置继续使用。
+`DOUBAN_API_KEY` 从 `v1.2.14` 起不再需要，可以删除。要让 Actions 使用 TMDB，把 Repository Variable `MOVIE_COVER_PROVIDER` 设为 `tmdb-first` 或 `tmdb-fallback`，再创建同名 Secret `TMDB_ACCESS_TOKEN`。旧版 `NOTION_DATABASE_ID` 只作为兼容回退，不建议新配置继续使用。
 
 ### 4. 手动测试工作流
 
@@ -446,7 +477,7 @@ schedule:
 
 ```bash
 git add .
-git commit -m "release: TunNest v1.4.0"
+git commit -m "release: TunNest v1.4.1"
 git push origin main
 ```
 
@@ -464,9 +495,9 @@ npm run package
 使用 GitHub CLI 创建 Release：
 
 ```bash
-gh release create v1.4.0 dist/tunnest-extension.zip \
-  --title "TunNest v1.4.0" \
-  --notes "囤囤 TunNest v1.4.0"
+gh release create v1.4.1 dist/tunnest-extension.zip \
+  --title "TunNest v1.4.1" \
+  --notes "囤囤 TunNest v1.4.1"
 ```
 
 推荐同时保留完整源码仓库和 Release ZIP：源码便于审计、Issue 与 Actions，Release 便于普通用户安装。Cloudflare Secret、GitHub Secret 和 Notion Token 都不会被打进 ZIP，仍需要按本文单独配置。

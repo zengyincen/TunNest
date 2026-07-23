@@ -3,9 +3,9 @@ import { activateLicense, deactivateCurrentDevice, entitlement } from "./lib/lic
 
 const $ = (selector) => document.querySelector(selector);
 const notionSources=["clip","weread","douban","doubanMovieTop250","doubanBookTop250","doubanMusicTop250","weibo"];
-const keys = ["licenseKey","notionToken","notionDatabaseIds","notionDatabaseId","wereadApiKey","doubanUserId","doubanAuthToken","weiboUids","weiboPages"];
+const keys = ["licenseKey","notionToken","notionDatabaseIds","notionDatabaseId","wereadApiKey","doubanUserId","doubanAuthToken","movieCoverProvider","tmdbAccessToken","weiboUids","weiboPages"];
 const stored = await chrome.storage.local.get(keys);
-for (const key of ["licenseKey","notionToken","wereadApiKey","doubanUserId","doubanAuthToken","weiboUids","weiboPages"]) if ($(`#${key}`)) $(`#${key}`).value = stored[key] || $(`#${key}`).value || "";
+for (const key of ["licenseKey","notionToken","wereadApiKey","doubanUserId","doubanAuthToken","movieCoverProvider","tmdbAccessToken","weiboUids","weiboPages"]) if ($(`#${key}`)) $(`#${key}`).value = stored[key] || $(`#${key}`).value || "";
 const notionDatabaseIds={...(stored.notionDatabaseIds||{})};if(!notionDatabaseIds.clip&&stored.notionDatabaseId)notionDatabaseIds.clip=stored.notionDatabaseId;
 for(const source of notionSources)$(`#${source}DatabaseId`).value=notionDatabaseIds[source]||"";
 renderPlans();
@@ -32,7 +32,7 @@ document.querySelectorAll("[data-notion-source]").forEach((button)=>button.addEv
   button.disabled=false;
 }));
 $("#saveSources").addEventListener("click", async () => {
-  const settings=Object.fromEntries(["wereadApiKey","doubanUserId","doubanAuthToken","weiboUids","weiboPages"].map((key)=>[key,$(`#${key}`).value.trim()]));
+  const settings=Object.fromEntries(["wereadApiKey","doubanUserId","doubanAuthToken","movieCoverProvider","tmdbAccessToken","weiboUids","weiboPages"].map((key)=>[key,$(`#${key}`).value.trim()]));
   const result=await chrome.runtime.sendMessage({type:"SAVE_SETTINGS",settings}); setToast("source",result.ok?"设置已保存":result.error,!result.ok);
 });
 
