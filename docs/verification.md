@@ -22,7 +22,7 @@
 ## 需要真实账号验证
 
 - 微信读书真实 Gateway API Key
-- 豆瓣真实用户 ID/API Key/Auth Token
+- 豆瓣真实用户 ID；私密条目场景还需 Auth Token
 - 微博真实浏览器登录态、验证码/432 风控状态、长微博全文、原图显示与不同用户主页（发布前人工验收）
 - Notion Integration Token 与正式数据库
 - Chrome Web Store 正式审核

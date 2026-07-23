@@ -100,19 +100,54 @@ export async function fetchWereadInPage() {
 }
 
 export async function fetchDouban(settings) {
-  if (!settings.doubanUserId || !settings.doubanApiKey) throw new Error("请先在设置中填写豆瓣用户 ID 和 API Key");
+  if (!settings.doubanUserId) throw new Error("请先在设置中填写豆瓣用户 ID");
+  const userId = normalizeDoubanUserId(settings.doubanUserId);
   const statuses = ["mark", "doing", "done"], types = ["book", "movie"], items = [];
   for (const type of types) for (const status of statuses) {
     for (let start = 0; start < 1000; start += 50) {
-      const url = new URL(`https://frodo.douban.com/api/v2/user/${encodeURIComponent(settings.doubanUserId)}/interests`);
-      url.search = new URLSearchParams({ type, status, start: String(start), count: "50", apiKey: settings.doubanApiKey }).toString();
-      const data = await requestJson(url.toString(), { headers: { ...(settings.doubanAuthToken ? { Authorization: `Bearer ${settings.doubanAuthToken}` } : {}), Referer: "https://servicewechat.com/wx2f9b06c1de1ccfca/84/page-frame.html" } });
+      const path = `/api/v2/user/${encodeURIComponent(userId)}/interests`;
+      const url = await signedDoubanUrl(path, { type, status, start: String(start), count: "50" });
+      const data = await requestJson(url, { headers: settings.doubanAuthToken ? { Authorization: `Bearer ${settings.doubanAuthToken}` } : {} });
       const interests = data.interests || [];
       for (const interest of interests) items.push(doubanItem(interest, type));
-      if (interests.length < 50) break;
+      if (!interests.length || start + interests.length >= Number(data.total || interests.length)) break;
     }
   }
   return unique(items);
+}
+
+const DOUBAN_API_KEY = "0dad551ec0f84ed02907ff5c42e8ec70";
+const DOUBAN_HMAC_SECRET = "bf7dddc7c9cfe6f7";
+let doubanSigningKey;
+
+async function signedDoubanUrl(path, params) {
+  const timestamp = String(Math.floor(Date.now() / 1000));
+  const payload = `GET&${encodeURIComponent(path)}&${timestamp}`;
+  doubanSigningKey ||= crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(DOUBAN_HMAC_SECRET),
+    { name: "HMAC", hash: "SHA-1" },
+    false,
+    ["sign"]
+  );
+  const signature = await crypto.subtle.sign("HMAC", await doubanSigningKey, new TextEncoder().encode(payload));
+  const base64 = bytesToBase64(new Uint8Array(signature));
+  const url = new URL(`https://frodo.douban.com${path}`);
+  url.search = new URLSearchParams({ ...params, apiKey: DOUBAN_API_KEY, _ts: timestamp, _sig: base64, os_rom: "android" }).toString();
+  return url.toString();
+}
+
+function normalizeDoubanUserId(value) {
+  const match = String(value || "").trim().match(/douban\.com\/people\/([^/?#]+)/i);
+  const userId = decodeURIComponent(match?.[1] || String(value || "").trim());
+  if (!/^[A-Za-z0-9._-]+$/.test(userId)) throw new Error("豆瓣用户 ID 格式不正确，请填写个人主页 /people/ 后面的 ID");
+  return userId;
+}
+
+function bytesToBase64(bytes) {
+  let binary = "";
+  for (let offset = 0; offset < bytes.length; offset += 0x8000) binary += String.fromCharCode(...bytes.subarray(offset, offset + 0x8000));
+  return btoa(binary);
 }
 
 // This function is injected into the MAIN world of an open m.weibo.cn tab.
@@ -365,5 +400,5 @@ function doubanItem(interest, type) {
   const comment = interest.comment || ""; const externalId = String(subject.id || subject.url || `${type}-${subject.title}`);
   return { source: "douban", kind: type, externalId, title: subject.title || "未命名条目", author: people.filter(Boolean).join(" / "), url: subject.url || `https://${type}.douban.com/subject/${externalId}/`, excerpt: comment || subject.intro || "", content: subject.intro || "", coverUrl: subject.pic?.large || subject.pic?.normal, tags: ["豆瓣", ...(interest.tags || []).map((tag) => tag.name || tag), ...(subject.genres || [])].filter(Boolean), highlights: comment ? [{ text: comment, note: `评分：${interest.rating?.value || "未评分"}` }] : [], capturedAt: interest.create_time || new Date().toISOString(), metadata: { status: interest.status, rating: interest.rating?.value || null } };
 }
-async function requestJson(url, init = {}) { const response = await fetch(url, { credentials: "include", ...init, headers: { Accept: "application/json", "Content-Type": "application/json", ...(init.headers || {}) } }); const data = await response.json().catch(() => ({})); if (!response.ok) throw new Error(data.errmsg || data.msg || `请求失败 (${response.status})`); return data; }
+async function requestJson(url, init = {}) { const response = await fetch(url, { credentials: "include", ...init, headers: { Accept: "application/json", "Content-Type": "application/json", ...(init.headers || {}) } }); const data = await response.json().catch(() => ({})); if (!response.ok || (data.code && Number(data.code) !== 0)) { const detail=Number(data.code)===997?"豆瓣接口要求签名，请更新到最新版 TunNest":data.errmsg||data.localized_message||data.msg; throw new Error(detail || `请求失败 (${response.status})`); } return data; }
 function unique(items) { return [...new Map(items.map((item) => [`${item.source}:${item.externalId}`, item])).values()]; }

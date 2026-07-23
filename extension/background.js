@@ -3,11 +3,12 @@ import { createArchiveDatabase, syncItems, verifyNotion } from "./lib/notion.js"
 import { extractCurrentPage, fetchDouban, fetchWeiboDesktopInPage, fetchWeiboInPage, fetchWeread, fetchWereadInPage } from "./lib/sources.js";
 const activeRuns = new Map();
 const WEIBO_IMAGE_HEADER_RULE_ID = 1001;
-let weiboImageHeadersReady = installWeiboImageHeaderRule().catch(logImageHeaderRuleError);
+const DOUBAN_API_HEADER_RULE_ID = 1002;
+let remoteHeadersReady = installRemoteHeaderRules().catch(logHeaderRuleError);
 
 chrome.runtime.onInstalled.addListener(async () => {
-  weiboImageHeadersReady = installWeiboImageHeaderRule().catch(logImageHeaderRuleError);
-  await weiboImageHeadersReady;
+  remoteHeadersReady = installRemoteHeaderRules().catch(logHeaderRuleError);
+  await remoteHeadersReady;
   chrome.contextMenus.create({ id: "clip-page", title: "保存到囤囤 TunNest", contexts: ["page", "selection"] });
   chrome.alarms.create("daily-sync", { periodInMinutes: 1440 });
 });
@@ -45,8 +46,8 @@ async function runSource(source, tabId, signal, runId) {
   await setSyncState({ source, runId, status: "running", phase: "checking", completed: 0, total: 0, startedAt, updatedAt: startedAt });
   try {
     const access = await entitlement(); if (!access.active) throw new Error(access.error || "需要有效订阅才能同步");
-    if (source === "weibo") await weiboImageHeadersReady.catch((error) => console.warn("微博配图请求头规则初始化失败", error));
-    const settings = await chrome.storage.local.get(["notionToken", "notionDatabaseIds", "notionDatabaseId", "wereadApiKey", "doubanUserId", "doubanApiKey", "doubanAuthToken", "weiboUids", "weiboPages"]);
+    if (source === "weibo" || source === "douban") await remoteHeadersReady.catch((error) => console.warn("远程请求头规则初始化失败", error));
+    const settings = await chrome.storage.local.get(["notionToken", "notionDatabaseIds", "notionDatabaseId", "wereadApiKey", "doubanUserId", "doubanAuthToken", "weiboUids", "weiboPages"]);
     const databaseIds = databaseMap(settings), databaseId = databaseIds[source];
     if (!settings.notionToken) throw new Error("请先填写 Notion Integration Token");
     if (!databaseId) throw new Error(`请先连接${sourceLabel(source)}数据库`);
@@ -96,9 +97,9 @@ async function cancelSync(source) {
   return { ok: true };
 }
 
-function installWeiboImageHeaderRule() {
+function installRemoteHeaderRules() {
   return chrome.declarativeNetRequest.updateDynamicRules({
-    removeRuleIds: [WEIBO_IMAGE_HEADER_RULE_ID],
+    removeRuleIds: [WEIBO_IMAGE_HEADER_RULE_ID, DOUBAN_API_HEADER_RULE_ID],
     addRules: [{
       id: WEIBO_IMAGE_HEADER_RULE_ID,
       priority: 1,
@@ -114,10 +115,26 @@ function installWeiboImageHeaderRule() {
         requestDomains: ["sinaimg.cn"],
         resourceTypes: ["xmlhttprequest"]
       }
+    }, {
+      id: DOUBAN_API_HEADER_RULE_ID,
+      priority: 1,
+      action: {
+        type: "modifyHeaders",
+        requestHeaders: [{
+          header: "User-Agent",
+          operation: "set",
+          value: "api-client/1 com.douban.frodo/7.22.0.beta9(231) Android/23 product/Mate40 vendor/HUAWEI model/Mate40 brand/HUAWEI rom/android network/wifi platform/AndroidPad"
+        }]
+      },
+      condition: {
+        initiatorDomains: [chrome.runtime.id],
+        requestDomains: ["frodo.douban.com"],
+        resourceTypes: ["xmlhttprequest"]
+      }
     }]
   });
 }
-function logImageHeaderRuleError(error) { console.warn("微博配图请求头规则初始化失败", error); }
+function logHeaderRuleError(error) { console.warn("远程请求头规则初始化失败", error); }
 
 async function runConfiguredSources() { const settings=await chrome.storage.local.get(["notionDatabaseIds","notionDatabaseId"]),ids=databaseMap(settings); for (const source of ["weread", "douban"]) if(ids[source]) try { await startSource(source); } catch { /* runSource already records the failure. */ } }
 async function fetchWereadFromLoggedInTab() {
@@ -187,7 +204,7 @@ function waitForTab(tabId, timeoutMessage = "微博页面加载超时") {
   });
 }
 async function status() { const access = await entitlement(); const settings = await chrome.storage.local.get(["notionToken", "notionDatabaseIds", "notionDatabaseId", "syncState"]),ids=databaseMap(settings),notionSources=Object.fromEntries(["clip","weread","douban","weibo"].map(source=>[source,!!(settings.notionToken&&ids[source])])),notionDatabaseCount=Object.values(notionSources).filter(Boolean).length,syncState=normalizeSyncState(settings.syncState);if(settings.syncState?.status==="running"&&syncState?.status!=="running")await setSyncState(syncState);return { ok: true, access, notionConnected:notionDatabaseCount>0, notionDatabaseCount, notionSources, syncState }; }
-async function saveSettings(settings) { const allowed = ["wereadApiKey", "doubanUserId", "doubanApiKey", "doubanAuthToken", "weiboUids", "weiboPages"]; await chrome.storage.local.set(Object.fromEntries(allowed.filter((key) => key in settings).map((key) => [key, settings[key]]))); return { ok: true }; }
+async function saveSettings(settings) { const allowed = ["wereadApiKey", "doubanUserId", "doubanAuthToken", "weiboUids", "weiboPages"]; await chrome.storage.local.set(Object.fromEntries(allowed.filter((key) => key in settings).map((key) => [key, settings[key]]))); return { ok: true }; }
 async function setupNotion(message) { const source=message.source;if(!["clip","weread","douban","weibo"].includes(source))throw new Error("未知 Notion 数据库类型");if (!message.notionToken) throw new Error("缺少 Notion Token"); let databaseId = message.databaseId; if (!databaseId) databaseId = await createArchiveDatabase(message.notionToken, message.parentPage,source); const database = await verifyNotion(message.notionToken, databaseId,source),stored=await chrome.storage.local.get("notionDatabaseIds"),notionDatabaseIds={...(stored.notionDatabaseIds||{}),[source]:database.id}; await chrome.storage.local.set({ notionToken: message.notionToken, notionDatabaseIds }); return { ok: true, database }; }
 async function addHistory(entry) { const { syncHistory = [] } = await chrome.storage.local.get("syncHistory"); await chrome.storage.local.set({ syncHistory: [entry, ...syncHistory].slice(0, 30) }); }
 async function recent() { const { syncHistory = [] } = await chrome.storage.local.get("syncHistory"); return { ok: true, items: syncHistory.slice(0, 8) }; }

@@ -6,7 +6,7 @@
 
   <p>
     <a href="../../actions/workflows/ci.yml"><img src="../../actions/workflows/ci.yml/badge.svg" alt="TunNest CI"></a>
-    <img src="https://img.shields.io/badge/release-v1.2.13-1D1D1F?style=flat-square" alt="Release v1.2.13">
+    <img src="https://img.shields.io/badge/release-v1.2.14-1D1D1F?style=flat-square" alt="Release v1.2.14">
     <img src="https://img.shields.io/badge/Chrome-Manifest_V3-4285F4?style=flat-square&logo=googlechrome&logoColor=white" alt="Chrome Manifest V3">
     <img src="https://img.shields.io/badge/同步来源-4-30D158?style=flat-square" alt="4 个同步来源">
     <img src="https://img.shields.io/badge/完整试用-7_天-FF9F0A?style=flat-square" alt="7 天完整试用">
@@ -55,7 +55,7 @@
 
 微博内容一旦成功写入你的 Notion，就不再依赖信息流排序；但源内容版权仍属于原作者，源站删除、账号权限变化或平台风控都可能影响后续同步。
 
-> 豆瓣过去的官方开放 API 已停止面向新项目申请。当前 Frodo 适配不是官方开放 API，可能随时因 Key、签名或风控策略变化而失效。
+> 豆瓣过去的官方开放 API 已停止面向新项目申请。TunNest 会自动生成 Frodo 当前要求的请求签名，无需用户配置 API Key；该适配不是官方开放 API，仍可能随时因签名或风控策略变化而失效。
 
 ### 一眼看懂
 

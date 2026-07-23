@@ -13,7 +13,7 @@ if(source==="all"||source==="weread"){
   failedCount+=await syncSource("weread",databaseId("WEREAD"),items);
 }
 if(source==="all"||source==="douban"){
-  const items=await getDoubanItems({userId:required("DOUBAN_USER_ID"),apiKey:required("DOUBAN_API_KEY"),authToken:process.env.DOUBAN_AUTH_TOKEN,apiHost:process.env.DOUBAN_API_HOST});
+  const items=await getDoubanItems({userId:required("DOUBAN_USER_ID"),authToken:process.env.DOUBAN_AUTH_TOKEN,apiHost:process.env.DOUBAN_API_HOST});
   failedCount+=await syncSource("douban",databaseId("DOUBAN"),items);
 }
 if(failedCount)process.exitCode=1;

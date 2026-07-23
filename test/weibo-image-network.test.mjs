@@ -16,7 +16,7 @@ test("adds a narrowly scoped Referer rule for extension image downloads", () => 
 });
 
 test("waits for the header rule and uploads downloaded bytes before external import", () => {
-  assert.match(background, /source === "weibo"\) await weiboImageHeadersReady/);
+  assert.match(background, /source === "weibo" \|\| source === "douban"\) await remoteHeadersReady/);
   assert.ok(notion.indexOf('mode: "single_part"') < notion.indexOf('mode: "external_url"'));
   assert.match(notion, /credentials:\s*"omit"/);
   assert.match(notion, /cache:\s*"no-store"/);

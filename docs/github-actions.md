@@ -14,7 +14,6 @@
 - `NOTION_DOUBAN_DATABASE_ID`：`囤囤 · 豆瓣书影音`数据库 ID
 - `WEREAD_API_KEY`：微信读书 Gateway API Key
 - `DOUBAN_USER_ID`：豆瓣数字用户 ID
-- `DOUBAN_API_KEY`：豆瓣/Frodo API Key
 - `DOUBAN_AUTH_TOKEN`：可选，用于非公开兴趣数据
 - `LICENSE_ADMIN_TOKEN`：仅许可证签发工作流需要
 
@@ -26,4 +25,4 @@
 
 ## 豆瓣风险说明
 
-豆瓣当前没有供新项目稳定申请的公开官方 API。Actions 使用的 Frodo 接口属于实验性兼容，可能因 API Key、签名、频率限制或上游策略变化失效，不应理解为豆瓣官方服务或授权。不要在仓库、Issue 或日志中公开豆瓣 Token/API Key。
+豆瓣当前没有供新项目稳定申请的公开官方 API。Actions 会自动生成 Frodo 当前要求的请求签名，无需配置 API Key；该接口仍属于实验性兼容，可能因签名、频率限制或上游策略变化失效，不应理解为豆瓣官方服务或授权。不要在仓库、Issue 或日志中公开豆瓣 Auth Token。

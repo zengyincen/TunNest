@@ -56,5 +56,4 @@ jobs:
           NOTION_DOUBAN_DATABASE_ID: ${{ secrets.NOTION_DOUBAN_DATABASE_ID }}
           NOTION_DATABASE_ID: ${{ secrets.NOTION_DATABASE_ID }}
           DOUBAN_USER_ID: ${{ secrets.DOUBAN_USER_ID }}
-          DOUBAN_API_KEY: ${{ secrets.DOUBAN_API_KEY }}
           DOUBAN_AUTH_TOKEN: ${{ secrets.DOUBAN_AUTH_TOKEN }}
