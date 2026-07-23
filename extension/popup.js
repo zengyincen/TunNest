@@ -52,7 +52,7 @@ function renderStatus(value) {
   const license = $("#licenseStatus"), notion = $("#notionStatus"), active = !!value.access?.active, count = value.notionDatabaseCount || 0;
   license.querySelector("span:last-child").textContent = value.access?.label || "未订阅";
   license.querySelector(".dot").className = `dot ${active ? "ok" : "warn"}`;
-  notion.querySelector("span:last-child").textContent = count ? `Notion 已连接 ${count}/4` : "Notion 待设置";
+  notion.querySelector("span:last-child").textContent = count ? `Notion 已连接 ${count}/${value.notionDatabaseTotal || 7}` : "Notion 待设置";
   notion.querySelector(".dot").className = `dot ${count ? "ok" : ""}`;
   $("#paywallTitle").textContent = value.access?.mode === "expired" ? "7 天完整试用已结束" : "订阅验证暂不可用";
   $("#paywall").classList.toggle("hidden", active);

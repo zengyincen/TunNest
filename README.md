@@ -6,7 +6,7 @@
 
   <p>
     <a href="https://github.com/zengyincen/TunNest/actions/workflows/ci.yml"><img src="https://github.com/zengyincen/TunNest/actions/workflows/ci.yml/badge.svg" alt="TunNest CI"></a>
-    <img src="https://img.shields.io/badge/release-v1.2.14-1D1D1F?style=flat-square" alt="Release v1.2.14">
+    <img src="https://img.shields.io/badge/release-v1.3.0-1D1D1F?style=flat-square" alt="Release v1.3.0">
     <img src="https://img.shields.io/badge/Chrome-Manifest_V3-4285F4?style=flat-square&logo=googlechrome&logoColor=white" alt="Chrome Manifest V3">
     <img src="https://img.shields.io/badge/同步来源-4-30D158?style=flat-square" alt="4 个同步来源">
     <img src="https://img.shields.io/badge/完整试用-7_天-FF9F0A?style=flat-square" alt="7 天完整试用">
@@ -29,19 +29,19 @@
 
 ## 囤囤是什么
 
-囤囤不是另一个内容平台，而是一条通往私人资料库的路。它把不同来源分别整理进四个 Notion 数据库，让读过的书、看过的电影、喜欢的博文和网页收藏真正可搜索、可整理、可长期回顾。
+囤囤不是另一个内容平台，而是一条通往私人资料库的路。它把四种来源整理进七个 Notion 数据库，让读过的书、看过的电影、喜欢的博文、三套豆瓣 Top 250 和网页收藏真正可搜索、可整理、可长期回顾。
 
 | 来源 | 保存内容 | 浏览器扩展 | GitHub Actions |
 |---|---|:---:|:---:|
 | 微信读书 | 书籍、封面、划线、笔记 | ✅ 浏览器登录或 Gateway | ✅ 需要 Gateway API Key |
-| 豆瓣 | 书籍、电影、状态、评分、短评、封面 | ✅ 自动签名 | ✅ 自动签名 |
+| 豆瓣 | 用户书影收藏 + 电影 / 图书 / 音乐 Top 250 | ✅ 自动签名与榜单抓取 | ✅ 自动签名与榜单抓取 |
 | 微博 | 用户博文、完整长文、转发内容、原图配图、互动数据 | ✅ 浏览器登录态 | — 不适合无人值守抓取 |
 | 任意网页 | 标题、正文、选区、作者、原文链接、封面 | ✅ 一键剪藏 | — 需要用户主动选择页面 |
 
 <table>
   <tr>
     <td align="center"><strong>4</strong><br><sub>类收藏来源</sub></td>
-    <td align="center"><strong>4</strong><br><sub>套独立 Notion 数据库</sub></td>
+    <td align="center"><strong>7</strong><br><sub>套独立 Notion 数据库</sub></td>
     <td align="center"><strong>7 天</strong><br><sub>新用户完整试用</sub></td>
     <td align="center"><strong>3 台</strong><br><sub>付费浏览器设备</sub></td>
     <td align="center"><strong>1 个</strong><br><sub>Actions 仓库槽位</sub></td>
@@ -87,7 +87,7 @@ dist/tunnest-extension.zip    # 可上传到 GitHub Release
 
 ## Notion 完整配置
 
-囤囤共用一个 Notion Internal Integration Token，但为四种来源分别连接数据库。四个数据库可以位于四个完全不同的 Notion 页面。
+囤囤共用一个 Notion Internal Integration Token，共连接七个数据库：网页、微信读书、微博各一个，豆瓣父页面下四个。四类来源可以位于四个不同父页面。
 
 ### 1. 创建 Notion Integration
 
@@ -105,7 +105,7 @@ Token 相当于进入数据库的钥匙，不要提交到 GitHub 源码，也不
 
 - 囤囤 · 网页剪藏；
 - 囤囤 · 微信读书；
-- 囤囤 · 豆瓣书影音；
+- 囤囤 · 豆瓣（这个页面下放置用户、电影 Top 250、图书 Top 250、音乐 Top 250）；
 - 囤囤 · 微博博文。
 
 在每个页面右上角打开“连接 / Connections”菜单，把刚创建的 Integration 加入页面。只有授权给 Integration 的页面才能创建或连接数据库。
@@ -117,9 +117,9 @@ Token 相当于进入数据库的钥匙，不要提交到 GitHub 源码，也不
 3. 在某个来源的“父页面链接”中粘贴对应 Notion 页面链接。
 4. 保持“已有数据库 ID”为空。
 5. 点击“创建或连接”。
-6. 对四个来源分别重复操作。
+6. 对网页、微信读书和微博分别重复操作；豆瓣卡片需要依次连接四个数据库。
 
-扩展会自动创建数据库和全部必需属性，并把生成的数据库 ID 保存到本机。
+扩展会自动创建数据库和全部必需属性，并把生成的数据库 ID 保存到本机。豆瓣卡片中的四个按钮使用同一个父页面链接，因此四个数据库会并列创建在同一 Notion 页面下。
 
 ### 4. 连接已有数据库
 
@@ -133,7 +133,7 @@ Token 相当于进入数据库的钥匙，不要提交到 GitHub 源码，也不
 扩展会自动把标题列改成该来源要求的名称，并创建缺失属性。如果同名属性存在但类型错误，为避免破坏数据，扩展会停止并列出冲突；请先在 Notion 中重命名或删除冲突属性，再重新连接。
 
 > [!WARNING]
-> 四个数据库里的“外部 ID”必须是普通“文本 / Rich text”属性，不能使用 Notion 的“唯一 ID / Unique ID”属性。它是 TunNest 更新和去重的关键字段。
+> 七个数据库里的“外部 ID”必须是普通“文本 / Rich text”属性，不能使用 Notion 的“唯一 ID / Unique ID”属性。它是 TunNest 更新和去重的关键字段。
 
 ### 网页剪藏数据库
 
@@ -169,9 +169,9 @@ Token 相当于进入数据库的钥匙，不要提交到 GitHub 源码，也不
 
 书籍图片会同时写入“封面”属性和 Notion 页面封面。
 
-### 豆瓣书影音数据库
+### 豆瓣用户数据库
 
-默认数据库名：`囤囤 · 豆瓣书影音`
+默认数据库名：`囤囤 · 豆瓣用户`
 
 | 属性 | Notion 类型 | 用途 |
 |---|---|---|
@@ -185,6 +185,30 @@ Token 相当于进入数据库的钥匙，不要提交到 GitHub 源码，也不
 | 短评 | 文本（Rich text） | 用户短评或简介 |
 | 标签 | 多选（Multi-select） | 用户标签和题材 |
 | 收藏时间 | 日期（Date） | 豆瓣标记时间 |
+| 外部 ID | 文本（Rich text） | Subject ID 去重键 |
+
+### 豆瓣电影 / 图书 / 音乐 Top 250 数据库
+
+默认数据库名分别为：
+
+- `囤囤 · 豆瓣电影 Top 250`；
+- `囤囤 · 豆瓣图书 Top 250`；
+- `囤囤 · 豆瓣音乐 Top 250`。
+
+三个榜单数据库使用相同属性结构：
+
+| 属性 | Notion 类型 | 用途 |
+|---|---|---|
+| 名称 | 标题（Title） | 电影、图书或音乐名称 |
+| 封面 | 文件与媒体（Files & media） | 海报、书封或专辑封面 |
+| 排名 | 数字（Number） | 榜单原始排名；上游条目下架时可能出现跳号 |
+| 评分 | 数字（Number） | 豆瓣当前评分 |
+| 评价人数 | 数字（Number） | 当前评价人数 |
+| 信息 | 文本（Rich text） | 导演、作者、艺人、年份、出版社等 |
+| 推荐语 | 文本（Rich text） | 榜单推荐语；音乐条目可能为空 |
+| 原条目 | URL | 豆瓣条目链接 |
+| 标签 | 多选（Multi-select） | 豆瓣及榜单类型 |
+| 抓取时间 | 日期（Date） | 本次榜单更新时间 |
 | 外部 ID | 文本（Rich text） | Subject ID 去重键 |
 
 ### 微博博文数据库
@@ -237,8 +261,11 @@ GitHub Actions 无法复用浏览器登录，因此自动同步微信读书时 `
 1. 打开自己的豆瓣主页，例如 `https://www.douban.com/people/example/`。
 2. 复制 `/people/` 后面的 ID，或直接复制完整主页链接。
 3. 粘贴到扩展设置的“豆瓣用户 ID”。
-4. 公共收藏无需 API Key，也通常不需要 Auth Token。
-5. 点击“同步豆瓣”。
+4. 在豆瓣数据库卡片中，用同一个父页面依次创建或连接用户、电影 Top 250、图书 Top 250、音乐 Top 250 四个数据库。
+5. 公共收藏无需 API Key，也通常不需要 Auth Token。
+6. 点击“同步豆瓣”。扩展会先读取输入用户的书影收藏，再抓取 `movie.douban.com/top250`、`book.douban.com/top250` 和 `music.douban.com/top250` 的全部分页，分别写入四个数据库。
+
+首次同步会创建约 750 个榜单页面，受 Notion API 速率限制通常需要数分钟，请保持浏览器运行。豆瓣偶尔会在某一页隐藏已下架条目，因此实际可见数量可能略少于 250；TunNest 会保留源站排名和其中的跳号，不会自行补造条目。
 
 从 `v1.2.14` 起，TunNest 会自动生成当前 Frodo 接口要求的时间戳与签名。旧版出现 `invalid_request_997` 时，请升级扩展并在 `chrome://extensions` 点击“重新加载”。
 
@@ -338,7 +365,10 @@ curl -X PATCH "$LICENSE_API_BASE/v1/admin/licenses/lic_xxx" \
 | `NOTION_TOKEN` | 两者 | 共用 Notion Integration Token |
 | `NOTION_WEREAD_DATABASE_ID` | 微信读书 | 微信读书数据库 ID |
 | `WEREAD_API_KEY` | 微信读书 | 微信读书 Gateway API Key |
-| `NOTION_DOUBAN_DATABASE_ID` | 豆瓣 | 豆瓣数据库 ID |
+| `NOTION_DOUBAN_DATABASE_ID` | 豆瓣 | 用户收藏数据库 ID |
+| `NOTION_DOUBAN_MOVIE_TOP250_DATABASE_ID` | 豆瓣 | 电影 Top 250 数据库 ID |
+| `NOTION_DOUBAN_BOOK_TOP250_DATABASE_ID` | 豆瓣 | 图书 Top 250 数据库 ID |
+| `NOTION_DOUBAN_MUSIC_TOP250_DATABASE_ID` | 豆瓣 | 音乐 Top 250 数据库 ID |
 | `DOUBAN_USER_ID` | 豆瓣 | `/people/` 后面的用户 ID |
 | `DOUBAN_AUTH_TOKEN` | 豆瓣，可选 | 仅非公开收藏需要 |
 | `LICENSE_ADMIN_TOKEN` | 仅发码 | 管理员密钥；每日同步本身不读取 |
@@ -383,7 +413,7 @@ schedule:
 
 ```bash
 git add .
-git commit -m "release: TunNest v1.2.14"
+git commit -m "release: TunNest v1.3.0"
 git push origin main
 ```
 
@@ -401,9 +431,9 @@ npm run package
 使用 GitHub CLI 创建 Release：
 
 ```bash
-gh release create v1.2.14 dist/tunnest-extension.zip \
-  --title "TunNest v1.2.14" \
-  --notes "囤囤 TunNest v1.2.14"
+gh release create v1.3.0 dist/tunnest-extension.zip \
+  --title "TunNest v1.3.0" \
+  --notes "囤囤 TunNest v1.3.0"
 ```
 
 推荐同时保留完整源码仓库和 Release ZIP：源码便于审计、Issue 与 Actions，Release 便于普通用户安装。Cloudflare Secret、GitHub Secret 和 Notion Token 都不会被打进 ZIP，仍需要按本文单独配置。
@@ -533,7 +563,7 @@ npm run deploy    # 部署 Worker
 
 ## 当前能力边界
 
-- 豆瓣当前使用非公开 Frodo 兼容接口，可能再次调整签名或风控；
+- 豆瓣用户收藏使用非公开 Frodo 兼容接口，三套 Top 250 读取公开网页；签名、页面结构和风控均可能变化；
 - 微博只支持浏览器主动同步，不提供 Actions 自动抓取；
 - 网页剪藏效果取决于页面结构、登录态和付费墙；
 - 微信读书 Actions 必须有 Gateway API Key，浏览器登录不能直接替代；

@@ -16,7 +16,7 @@ test("binds popup actions before starting asynchronous initialization", () => {
 test("persists synchronization progress for popup reopen", () => {
   assert.match(background, /chrome\.storage\.local\.set\(\{ syncState \}\)/);
   assert.match(background, /phase: "writing"/);
-  assert.match(background, /updateSyncState\(\{ completed, total, detail \}, runId\)/);
+  assert.match(background, /updateSyncState\(\{ completed: offset \+ completed, total, detail:/);
   assert.match(popup, /chrome\.storage\.onChanged\.addListener/);
   assert.match(popupHtml, /id="syncProgress"/);
 });

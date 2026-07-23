@@ -2,7 +2,7 @@ import { PRODUCT } from "./config.js";
 import { activateLicense, deactivateCurrentDevice, entitlement } from "./lib/license.js";
 
 const $ = (selector) => document.querySelector(selector);
-const notionSources=["clip","weread","douban","weibo"];
+const notionSources=["clip","weread","douban","doubanMovieTop250","doubanBookTop250","doubanMusicTop250","weibo"];
 const keys = ["licenseKey","notionToken","notionDatabaseIds","notionDatabaseId","wereadApiKey","doubanUserId","doubanAuthToken","weiboUids","weiboPages"];
 const stored = await chrome.storage.local.get(keys);
 for (const key of ["licenseKey","notionToken","wereadApiKey","doubanUserId","doubanAuthToken","weiboUids","weiboPages"]) if ($(`#${key}`)) $(`#${key}`).value = stored[key] || $(`#${key}`).value || "";
@@ -26,8 +26,8 @@ $("#deactivateDevice").addEventListener("click", async () => {
 $("#installationCode").addEventListener("click", () => navigator.clipboard.writeText($("#installationCode").textContent));
 $("#openWeread").addEventListener("click", () => chrome.tabs.create({ url: "https://weread.qq.com/" }));
 document.querySelectorAll("[data-notion-source]").forEach((button)=>button.addEventListener("click",async()=>{
-  const source=button.dataset.notionSource,prefix=`${source}Notion`;setToast(prefix,"正在连接…");button.disabled=true;
-  const result=await chrome.runtime.sendMessage({type:"SETUP_NOTION",source,notionToken:$("#notionToken").value.trim(),parentPage:$(`#${source}ParentPage`).value.trim(),databaseId:$(`#${source}DatabaseId`).value.trim()});
+  const source=button.dataset.notionSource,group=button.dataset.notionGroup||source,prefix=`${group}Notion`;setToast(prefix,"正在连接…");button.disabled=true;
+  const result=await chrome.runtime.sendMessage({type:"SETUP_NOTION",source,notionToken:$("#notionToken").value.trim(),parentPage:$(`#${group}ParentPage`).value.trim(),databaseId:$(`#${source}DatabaseId`).value.trim()});
   if(result.ok){$(`#${source}DatabaseId`).value=result.database.id;setToast(prefix,`已连接 ${result.database.title}`);}else setToast(prefix,result.error,true);
   button.disabled=false;
 }));

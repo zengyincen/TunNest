@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { normalizeDouban, normalizeDoubanUserId, signedDoubanUrl } from "../automation/sources/douban.mjs";
+import { parseDoubanTop250 } from "../extension/lib/douban-top250.js";
 
 test("normalizes a Douban book interest", () => {
   const item = normalizeDouban({ status: "done", create_time: "2026-07-01T12:00:00+08:00", comment: "值得重读", rating: { value: 5 }, tags: [{ name: "社会学" }], subject: { id: "42", title: "测试书", url: "https://book.douban.com/subject/42/", author: ["某作者"], intro: "简介", genres: ["非虚构"] } }, "book");
@@ -19,4 +20,14 @@ test("signs current Frodo requests", () => {
 
 test("accepts a full Douban profile URL", () => {
   assert.equal(normalizeDoubanUserId("https://www.douban.com/people/example.name/"), "example.name");
+});
+
+test("parses movie, book and music Top 250 entries", () => {
+  const movie=parseDoubanTop250(`<ol class="grid_view"><li><div class="pic"><em>1</em><a href="https://movie.douban.com/subject/1292052/"><img alt="肖申克的救赎" src="https://img.test/movie.jpg"></a></div><div class="bd"><p>导演: 测试<br>1994 / 美国 / 剧情</p><div><span class="rating_num">9.7</span><span>3306537人评价</span></div><p class="quote"><span>希望让人自由。</span></p></div></li></ol>`,"movie")[0];
+  const book=parseDoubanTop250(`<table><tr class="item"><td><a href="https://book.douban.com/subject/1007305/"><img src="https://img.test/s/public/book.jpg"></a></td><td><div class="pl2"><a href="https://book.douban.com/subject/1007305/" title="红楼梦">红楼梦</a></div><p class="pl">曹雪芹 / 人民文学出版社</p><span class="rating_nums">9.7</span><span>466268人评价</span><p class="quote"><span class="inq">都云作者痴</span></p></td></tr></table>`,"book")[0];
+  const music=parseDoubanTop250(`<table><tr class="item"><td><a href="https://music.douban.com/subject/2995812/"><img src="https://img.test/s/public/music.jpg"></a></td><td><div class="pl2"><a href="https://music.douban.com/subject/2995812/">We Sing</a><p class="pl">Jason Mraz / 2008 / 民谣</p><div class="star"><span class="rating_nums">9.1</span><span>117051人评价</span></div></div></td></tr></table>`,"music")[0];
+  assert.deepEqual([movie.title,movie.metadata.rank,movie.metadata.rating,movie.metadata.ratingCount],["肖申克的救赎",1,9.7,3306537]);
+  assert.deepEqual([book.title,book.author,book.metadata.quote],["红楼梦","曹雪芹","都云作者痴"]);
+  assert.deepEqual([music.title,music.author,music.source],["We Sing","Jason Mraz","doubanMusicTop250"]);
+  assert.match(book.coverUrl,/\/l\/public\//);
 });

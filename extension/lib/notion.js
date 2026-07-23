@@ -23,13 +23,25 @@ export const NOTION_DATABASE_SCHEMAS = {
     }
   },
   douban: {
-    label: "豆瓣书影音", title: "囤囤 · 豆瓣书影音", icon: "🎬",
+    label: "豆瓣用户收藏", title: "囤囤 · 豆瓣用户", icon: "👤",
     properties: {
       "名称": { title: {} }, "封面": { files: {} }, "类型": { select: {} }, "原条目": { url: {} },
       "主创": { rich_text: {} }, "状态": { select: {} }, "评分": { number: {} },
       "短评": { rich_text: {} }, "标签": { multi_select: {} },
       "收藏时间": { date: {} }, "外部 ID": { rich_text: {} }
     }
+  },
+  doubanMovieTop250: {
+    label: "豆瓣电影 Top 250", title: "囤囤 · 豆瓣电影 Top 250", icon: "🎞️",
+    properties: top250Properties()
+  },
+  doubanBookTop250: {
+    label: "豆瓣图书 Top 250", title: "囤囤 · 豆瓣图书 Top 250", icon: "📚",
+    properties: top250Properties()
+  },
+  doubanMusicTop250: {
+    label: "豆瓣音乐 Top 250", title: "囤囤 · 豆瓣音乐 Top 250", icon: "🎵",
+    properties: top250Properties()
   },
   weibo: {
     label: "微博博文", title: "囤囤 · 微博博文", icon: "📰",
@@ -99,12 +111,13 @@ async function upsertItem(token, databaseId, item, source, context = {}) {
   const cover = pageCover(item);
   if (query.results?.[0]) {
     await notion(token, `/pages/${query.results[0].id}`, withSignal({ method: "PATCH", body: JSON.stringify({ properties, ...(cover ? { cover } : {}) }) }, signal));
+    if (isTop250Source(source)) return query.results[0].id;
     if (source === "weibo") await syncUploadedImages(token, query.results[0].id, item, context);
     await onDetail("正在更新正文");
     await replaceManagedBlocks(token, query.results[0].id, item, signal);
     return query.results[0].id;
   }
-  const page = await notion(token, "/pages", withSignal({ method: "POST", body: JSON.stringify({ parent: { database_id: databaseId }, properties, ...(cover ? { cover } : {}), children: [managedBlock(item)] }) }, signal));
+  const page = await notion(token, "/pages", withSignal({ method: "POST", body: JSON.stringify({ parent: { database_id: databaseId }, properties, ...(cover ? { cover } : {}), ...(!isTop250Source(source) ? { children: [managedBlock(item)] } : {}) }) }, signal));
   if (source === "weibo") await syncUploadedImages(token, page.id, item, context);
   return page.id;
 }
@@ -157,6 +170,13 @@ function propertiesFor(item, externalId, source) {
     "状态": { select: { name: doubanStatus(metadata.status, item.kind) } }, "评分": number(metadata.rating),
     "短评": { rich_text: rich(item.excerpt || "", 1900) }, "标签": tags,
     "收藏时间": date(item.capturedAt), "外部 ID": { rich_text: rich(externalId, 1900) }
+  };
+  if (["doubanMovieTop250", "doubanBookTop250", "doubanMusicTop250"].includes(source)) return {
+    "名称": { title: rich(item.title, 1900) }, "封面": cover,
+    "排名": number(metadata.rank), "评分": number(metadata.rating), "评价人数": number(metadata.ratingCount),
+    "信息": { rich_text: rich(metadata.info || item.author || "", 1900) },
+    "推荐语": { rich_text: rich(metadata.quote || "", 1900) }, "原条目": { url: item.url || null },
+    "标签": tags, "抓取时间": date(item.capturedAt), "外部 ID": { rich_text: rich(externalId, 1900) }
   };
   return {
     "博文": { title: rich(item.title, 1900) }, "封面": cover, "用户": { rich_text: rich(item.author || "", 1900) },
@@ -289,10 +309,11 @@ async function notion(token, path, init = {}, version = VERSION) {
   if (!response.ok) throw new Error(data.message || `Notion 请求失败 (${response.status})`); return data;
 }
 function sourceSchema(source) { const schema = NOTION_DATABASE_SCHEMAS[source]; if (!schema) throw new Error("未知 Notion 数据库类型"); return schema; }
+function isTop250Source(source) { return ["doubanMovieTop250", "doubanBookTop250", "doubanMusicTop250"].includes(source); }
 function rich(value, max = 2000) { return value ? [{ type: "text", text: { content: String(value).slice(0, max) } }] : []; }
 function split(value) { return String(value).split(/\n{2,}/).map((part) => part.trim()).filter(Boolean).flatMap((part) => part.match(/[\s\S]{1,1900}/g) || []); }
 function notionId(value) { const match = String(value || "").match(/[0-9a-f]{32}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i); if (!match) throw new Error("Notion 页面或数据库 ID 无效"); return match[0]; }
-function kindLabel(value) { return ({ article: "文章", webpage: "网页", book: "书籍", movie: "电影", review: "评论", post: "博文" })[value] || value || "其他"; }
+function kindLabel(value) { return ({ article: "文章", webpage: "网页", book: "书籍", movie: "电影", music: "音乐", review: "评论", post: "博文" })[value] || value || "其他"; }
 function doubanStatus(value, kind) { const book = kind === "book"; return ({ mark: book ? "想读" : "想看", doing: book ? "在读" : "在看", done: book ? "读过" : "看过" })[value] || "未标记"; }
 function date(value) { const parsed = Date.parse(value); return { date: { start: Number.isNaN(parsed) ? new Date().toISOString() : new Date(parsed).toISOString() } }; }
 function number(value) { const parsed = Number(value); return { number: value === null || value === undefined || value === "" || !Number.isFinite(parsed) ? null : parsed }; }
@@ -302,6 +323,7 @@ function imageExtension(type, pathname) { return ({ "image/jpeg": "jpg", "image/
 function normalizeImageType(value) { const type = String(value || "").split(";", 1)[0].toLowerCase(); return type === "image/jpg" ? "image/jpeg" : type.startsWith("image/") ? type : ""; }
 function imageTypeFromPath(pathname) { return ({ jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", gif: "image/gif", webp: "image/webp", avif: "image/avif" })[pathname.match(/\.([a-z0-9]+)$/i)?.[1]?.toLowerCase()] || ""; }
 function imageFallbackBlock(image) { return { object: "block", type: "paragraph", paragraph: { rich_text: [{ type: "text", text: { content: `${MANAGED_IMAGE_CAPTION}配图上传失败 · ${image.caption}（打开原图）`, link: { url: image.url } } }] } }; }
+function top250Properties() { return { "名称": { title: {} }, "封面": { files: {} }, "排名": { number: {} }, "评分": { number: {} }, "评价人数": { number: {} }, "信息": { rich_text: {} }, "推荐语": { rich_text: {} }, "原条目": { url: {} }, "标签": { multi_select: {} }, "抓取时间": { date: {} }, "外部 ID": { rich_text: {} } }; }
 function representativeImageUrl(item) { const image=(item.images||[])[0],value=typeof image==="string"?image:image?.url;return normalizeImageUrl(item.coverUrl||value); }
 function normalizeImageUrl(value) { const normalized=String(value||"").trim().replace(/^http:/i,"https:").replace(/^\/\//,"https://");if(!normalized)return "";try{const url=new URL(normalized);return url.protocol==="https:"&&url.href.length<=2000?url.href:"";}catch{return "";} }
 function pageCover(item) { const url=representativeImageUrl(item);return url?{type:"external",external:{url}}:null; }

@@ -15,7 +15,7 @@
 - 同一 Chrome Sync 试用标识在更换安装码后沿用相同到期时间
 - 试用到期返回 `TRIAL_EXPIRED` 并进入付费墙
 - 3 个浏览器槽位与 1 个独立 Actions 槽位验证通过；释放旧浏览器后可绑定新设备
-- 网页剪藏、微信读书、豆瓣和微博四套 Notion 数据库 schema 与设置项静态验证通过
+- 网页剪藏、微信读书、豆瓣用户、三套豆瓣 Top 250 和微博共七套 Notion 数据库 schema 与设置项静态验证通过
 - License Worker Wrangler dry-run
 - npm production audit：0 vulnerabilities
 

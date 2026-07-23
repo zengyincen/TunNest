@@ -9,11 +9,14 @@ const workflow=readFileSync(new URL("../.github/workflows/daily-sync.yml",import
 const notionClient=readFileSync(new URL("../extension/lib/notion.js",import.meta.url),"utf8");
 const databaseData=(source,id="a".repeat(32))=>({id,title:[],properties:Object.fromEntries(Object.entries(NOTION_DATABASE_SCHEMAS[source].properties).map(([name,definition])=>[name,{type:Object.keys(definition)[0]}]))});
 
-test("defines four independent Notion database schemas",()=>{
-  assert.deepEqual(Object.keys(NOTION_DATABASE_SCHEMAS),["clip","weread","douban","weibo"]);
+test("defines independent Notion schemas including four Douban databases",()=>{
+  assert.deepEqual(Object.keys(NOTION_DATABASE_SCHEMAS),["clip","weread","douban","doubanMovieTop250","doubanBookTop250","doubanMusicTop250","weibo"]);
   assert.deepEqual(Object.keys(NOTION_DATABASE_SCHEMAS.clip.properties),["标题","封面","类型","原文","作者","摘要","标签","收藏时间","外部 ID"]);
   assert.deepEqual(Object.keys(NOTION_DATABASE_SCHEMAS.weread.properties),["书名","封面","作者","原书链接","划线数量","同步摘要","标签","同步时间","外部 ID"]);
   assert.deepEqual(Object.keys(NOTION_DATABASE_SCHEMAS.douban.properties),["名称","封面","类型","原条目","主创","状态","评分","短评","标签","收藏时间","外部 ID"]);
+  for(const source of ["doubanMovieTop250","doubanBookTop250","doubanMusicTop250"]){
+    assert.deepEqual(Object.keys(NOTION_DATABASE_SCHEMAS[source].properties),["名称","封面","排名","评分","评价人数","信息","推荐语","原条目","标签","抓取时间","外部 ID"]);
+  }
   assert.deepEqual(Object.keys(NOTION_DATABASE_SCHEMAS.weibo.properties),["博文","封面","用户","原博文","正文摘要","转发数","评论数","点赞数","标签","发布时间","外部 ID"]);
   for(const schema of Object.values(NOTION_DATABASE_SCHEMAS)){
     assert.equal(Object.values(schema.properties).filter(value=>"title" in value).length,1);
@@ -29,11 +32,18 @@ test("routes every extension source to its own configured database",()=>{
     assert.match(options,new RegExp(`id="${source}DatabaseId"`));
     assert.match(options,new RegExp(`data-notion-source="${source}"`));
   }
+  for(const source of ["doubanMovieTop250","doubanBookTop250","doubanMusicTop250"]){
+    assert.match(options,new RegExp(`id="${source}DatabaseId"`));
+    assert.match(options,new RegExp(`data-notion-source="${source}"`));
+  }
 });
 
 test("uses separate WeRead and Douban database secrets in Actions",()=>{
   assert.match(workflow,/NOTION_WEREAD_DATABASE_ID/);
   assert.match(workflow,/NOTION_DOUBAN_DATABASE_ID/);
+  assert.match(workflow,/NOTION_DOUBAN_MOVIE_TOP250_DATABASE_ID/);
+  assert.match(workflow,/NOTION_DOUBAN_BOOK_TOP250_DATABASE_ID/);
+  assert.match(workflow,/NOTION_DOUBAN_MUSIC_TOP250_DATABASE_ID/);
 });
 
 test("uses Notion-supported emoji icons in block payloads",()=>{
@@ -59,6 +69,21 @@ test("writes book artwork to the page cover and Files property",async()=>{
     const payload=JSON.parse(create.init.body);
     assert.deepEqual(payload.cover,{type:"external",external:{url:"https://cdn.weread.qq.com/cover/book-1.jpg"}});
     assert.deepEqual(payload.properties["封面"],{files:[{name:"封面",type:"external",external:{url:"https://cdn.weread.qq.com/cover/book-1.jpg"}}]});
+  }finally{globalThis.fetch=previousFetch;}
+});
+
+test("writes a Top 250 entry as property-only structured data",async()=>{
+  const previousFetch=globalThis.fetch,calls=[];
+  globalThis.fetch=async(url,init={})=>{calls.push({url:String(url),init});const value=String(url),data=value.endsWith("/query")?{results:[]}:value.includes("/databases/")&&init.method!=="PATCH"?databaseData("doubanMovieTop250"):value.endsWith("/pages")?{id:"top-page"}:{};return{ok:true,status:200,json:async()=>data};};
+  try{
+    const result=await syncItems("token","d".repeat(32),[{source:"doubanMovieTop250",kind:"movie",externalId:"1292052",title:"肖申克的救赎",url:"https://movie.douban.com/subject/1292052/",coverUrl:"https://img.test/poster.jpg",tags:["豆瓣","电影 Top 250"],capturedAt:"2026-07-23T00:00:00Z",metadata:{rank:1,rating:9.7,ratingCount:3306537,info:"1994 / 美国",quote:"希望让人自由。"}}],"doubanMovieTop250");
+    assert.equal(result[0].ok,true);
+    const payload=JSON.parse(calls.find(call=>call.url.endsWith("/pages")).init.body);
+    assert.equal(payload.children,undefined);
+    assert.equal(payload.properties["排名"].number,1);
+    assert.equal(payload.properties["评分"].number,9.7);
+    assert.equal(payload.properties["评价人数"].number,3306537);
+    assert.equal(payload.properties["推荐语"].rich_text[0].text.content,"希望让人自由。");
   }finally{globalThis.fetch=previousFetch;}
 });
 

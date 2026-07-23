@@ -1,9 +1,12 @@
 import { entitlement } from "./lib/license.js";
+import { DOUBAN_TOP250_TARGETS, fetchAllDoubanTop250 } from "./lib/douban-top250.js";
 import { createArchiveDatabase, syncItems, verifyNotion } from "./lib/notion.js";
 import { extractCurrentPage, fetchDouban, fetchWeiboDesktopInPage, fetchWeiboInPage, fetchWeread, fetchWereadInPage } from "./lib/sources.js";
 const activeRuns = new Map();
 const WEIBO_IMAGE_HEADER_RULE_ID = 1001;
 const DOUBAN_API_HEADER_RULE_ID = 1002;
+const DOUBAN_WEB_HEADER_RULE_ID = 1003;
+const DOUBAN_DATABASE_SOURCES = ["douban", ...DOUBAN_TOP250_TARGETS.map((target) => target.source)];
 let remoteHeadersReady = installRemoteHeaderRules().catch(logHeaderRuleError);
 
 chrome.runtime.onInstalled.addListener(async () => {
@@ -50,32 +53,48 @@ async function runSource(source, tabId, signal, runId) {
     const settings = await chrome.storage.local.get(["notionToken", "notionDatabaseIds", "notionDatabaseId", "wereadApiKey", "doubanUserId", "doubanAuthToken", "weiboUids", "weiboPages"]);
     const databaseIds = databaseMap(settings), databaseId = databaseIds[source];
     if (!settings.notionToken) throw new Error("请先填写 Notion Integration Token");
-    if (!databaseId) throw new Error(`请先连接${sourceLabel(source)}数据库`);
+    if (source === "douban") {
+      const missing = DOUBAN_DATABASE_SOURCES.filter((target) => !databaseIds[target]);
+      if (missing.length) throw new Error(`请先连接${missing.map(sourceLabel).join("、")}数据库`);
+    } else if (!databaseId) throw new Error(`请先连接${sourceLabel(source)}数据库`);
     await updateSyncState({ phase: "reading" }, runId);
-    let items;
+    let batches;
     if (source === "clip") {
       const targetId = tabId || (await activeTab())?.id; if (!targetId) throw new Error("没有可剪藏的页面");
-      const result = await chrome.scripting.executeScript({ target: { tabId: targetId }, func: extractCurrentPage }); items = [result[0].result];
-    } else if (source === "weread") items = settings.wereadApiKey ? await fetchWeread(settings.wereadApiKey) : await fetchWereadFromLoggedInTab();
-    else if (source === "douban") items = await fetchDouban(settings);
-    else if (source === "weibo") items = await fetchWeiboFromLoggedInTab(settings);
+      const result = await chrome.scripting.executeScript({ target: { tabId: targetId }, func: extractCurrentPage }); batches = [{ target: source, items: [result[0].result] }];
+    } else if (source === "weread") batches = [{ target: source, items: settings.wereadApiKey ? await fetchWeread(settings.wereadApiKey) : await fetchWereadFromLoggedInTab() }];
+    else if (source === "douban") {
+      const userItems = await fetchDouban(settings);
+      const top250 = await fetchAllDoubanTop250({
+        signal,
+        onProgress: ({ label, completedPages, totalPages }) => updateSyncState({ detail: `正在读取豆瓣${label} Top 250 · ${completedPages + 1}/${totalPages} 页` }, runId)
+      });
+      batches = [{ target: "douban", items: userItems }, ...DOUBAN_TOP250_TARGETS.map(({ source: target }) => ({ target, items: top250[target] }))];
+    }
+    else if (source === "weibo") batches = [{ target: source, items: await fetchWeiboFromLoggedInTab(settings) }];
     else throw new Error("未知同步来源");
     if (signal.aborted) throw new Error("同步已停止");
-    await updateSyncState({ phase: "writing", completed: 0, total: items.length }, runId);
-    const results = await syncItems(
-      settings.notionToken,
-      databaseId,
-      items,
-      source,
-      (completed, total, detail) => updateSyncState({ completed, total, detail }, runId),
-      { signal }
-    );
+    const total = batches.reduce((sum, batch) => sum + batch.items.length, 0), results = [];
+    await updateSyncState({ phase: "writing", completed: 0, total }, runId);
+    let offset = 0;
+    for (const batch of batches) {
+      const batchResults = await syncItems(
+        settings.notionToken,
+        databaseIds[batch.target],
+        batch.items,
+        batch.target,
+        (completed, _batchTotal, detail) => updateSyncState({ completed: offset + completed, total, detail: `${sourceLabel(batch.target)} · ${detail}` }, runId),
+        { signal }
+      );
+      results.push(...batchResults);
+      offset += batch.items.length;
+    }
     const succeeded = results.filter((item) => item.ok).length, failed = results.length - succeeded;
     const error = failed ? results.find((item) => !item.ok)?.error : undefined;
     const finishedAt = new Date().toISOString();
     await addHistory({ source, succeeded, failed, error, at: finishedAt });
-    await updateSyncState({ status: failed ? "error" : "completed", phase: "done", completed: items.length, total: items.length, succeeded, failed, error, finishedAt }, runId);
-    return { ok: failed === 0, count: items.length, succeeded, failed, error };
+    await updateSyncState({ status: failed ? "error" : "completed", phase: "done", completed: total, total, succeeded, failed, error, finishedAt }, runId);
+    return { ok: failed === 0, count: total, succeeded, failed, error };
   } catch (error) {
     const finishedAt = new Date().toISOString();
     const stopped = signal.aborted;
@@ -99,7 +118,7 @@ async function cancelSync(source) {
 
 function installRemoteHeaderRules() {
   return chrome.declarativeNetRequest.updateDynamicRules({
-    removeRuleIds: [WEIBO_IMAGE_HEADER_RULE_ID, DOUBAN_API_HEADER_RULE_ID],
+    removeRuleIds: [WEIBO_IMAGE_HEADER_RULE_ID, DOUBAN_API_HEADER_RULE_ID, DOUBAN_WEB_HEADER_RULE_ID],
     addRules: [{
       id: WEIBO_IMAGE_HEADER_RULE_ID,
       priority: 1,
@@ -131,12 +150,28 @@ function installRemoteHeaderRules() {
         requestDomains: ["frodo.douban.com"],
         resourceTypes: ["xmlhttprequest"]
       }
+    }, {
+      id: DOUBAN_WEB_HEADER_RULE_ID,
+      priority: 1,
+      action: {
+        type: "modifyHeaders",
+        requestHeaders: [{
+          header: "User-Agent",
+          operation: "set",
+          value: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/138.0 Safari/537.36"
+        }]
+      },
+      condition: {
+        initiatorDomains: [chrome.runtime.id],
+        requestDomains: ["movie.douban.com", "book.douban.com", "music.douban.com"],
+        resourceTypes: ["xmlhttprequest"]
+      }
     }]
   });
 }
 function logHeaderRuleError(error) { console.warn("远程请求头规则初始化失败", error); }
 
-async function runConfiguredSources() { const settings=await chrome.storage.local.get(["notionDatabaseIds","notionDatabaseId"]),ids=databaseMap(settings); for (const source of ["weread", "douban"]) if(ids[source]) try { await startSource(source); } catch { /* runSource already records the failure. */ } }
+async function runConfiguredSources() { const settings=await chrome.storage.local.get(["notionDatabaseIds","notionDatabaseId"]),ids=databaseMap(settings); for (const source of ["weread", "douban"]) if(source==="douban"?DOUBAN_DATABASE_SOURCES.every(target=>ids[target]):ids[source]) try { await startSource(source); } catch { /* runSource already records the failure. */ } }
 async function fetchWereadFromLoggedInTab() {
   const tabs = await chrome.tabs.query({ url: ["https://weread.qq.com/*"] });
   let tab = newestTab(tabs);
@@ -203,9 +238,9 @@ function waitForTab(tabId, timeoutMessage = "微博页面加载超时") {
     };
   });
 }
-async function status() { const access = await entitlement(); const settings = await chrome.storage.local.get(["notionToken", "notionDatabaseIds", "notionDatabaseId", "syncState"]),ids=databaseMap(settings),notionSources=Object.fromEntries(["clip","weread","douban","weibo"].map(source=>[source,!!(settings.notionToken&&ids[source])])),notionDatabaseCount=Object.values(notionSources).filter(Boolean).length,syncState=normalizeSyncState(settings.syncState);if(settings.syncState?.status==="running"&&syncState?.status!=="running")await setSyncState(syncState);return { ok: true, access, notionConnected:notionDatabaseCount>0, notionDatabaseCount, notionSources, syncState }; }
+async function status() { const access = await entitlement(); const settings = await chrome.storage.local.get(["notionToken", "notionDatabaseIds", "notionDatabaseId", "syncState"]),ids=databaseMap(settings),targets=["clip","weread",...DOUBAN_DATABASE_SOURCES,"weibo"],notionSources=Object.fromEntries(["clip","weread","douban","weibo"].map(source=>[source,!!(settings.notionToken&&(source==="douban"?DOUBAN_DATABASE_SOURCES.every(target=>ids[target]):ids[source]))])),notionDatabaseCount=targets.filter(target=>settings.notionToken&&ids[target]).length,notionDatabaseTotal=targets.length,syncState=normalizeSyncState(settings.syncState);if(settings.syncState?.status==="running"&&syncState?.status!=="running")await setSyncState(syncState);return { ok: true, access, notionConnected:notionDatabaseCount>0, notionDatabaseCount, notionDatabaseTotal, notionSources, syncState }; }
 async function saveSettings(settings) { const allowed = ["wereadApiKey", "doubanUserId", "doubanAuthToken", "weiboUids", "weiboPages"]; await chrome.storage.local.set(Object.fromEntries(allowed.filter((key) => key in settings).map((key) => [key, settings[key]]))); return { ok: true }; }
-async function setupNotion(message) { const source=message.source;if(!["clip","weread","douban","weibo"].includes(source))throw new Error("未知 Notion 数据库类型");if (!message.notionToken) throw new Error("缺少 Notion Token"); let databaseId = message.databaseId; if (!databaseId) databaseId = await createArchiveDatabase(message.notionToken, message.parentPage,source); const database = await verifyNotion(message.notionToken, databaseId,source),stored=await chrome.storage.local.get("notionDatabaseIds"),notionDatabaseIds={...(stored.notionDatabaseIds||{}),[source]:database.id}; await chrome.storage.local.set({ notionToken: message.notionToken, notionDatabaseIds }); return { ok: true, database }; }
+async function setupNotion(message) { const source=message.source;if(!["clip","weread","douban","doubanMovieTop250","doubanBookTop250","doubanMusicTop250","weibo"].includes(source))throw new Error("未知 Notion 数据库类型");if (!message.notionToken) throw new Error("缺少 Notion Token"); let databaseId = message.databaseId; if (!databaseId) databaseId = await createArchiveDatabase(message.notionToken, message.parentPage,source); const database = await verifyNotion(message.notionToken, databaseId,source),stored=await chrome.storage.local.get("notionDatabaseIds"),notionDatabaseIds={...(stored.notionDatabaseIds||{}),[source]:database.id}; await chrome.storage.local.set({ notionToken: message.notionToken, notionDatabaseIds }); return { ok: true, database }; }
 async function addHistory(entry) { const { syncHistory = [] } = await chrome.storage.local.get("syncHistory"); await chrome.storage.local.set({ syncHistory: [entry, ...syncHistory].slice(0, 30) }); }
 async function recent() { const { syncHistory = [] } = await chrome.storage.local.get("syncHistory"); return { ok: true, items: syncHistory.slice(0, 8) }; }
 async function setSyncState(syncState) { await chrome.storage.local.set({ syncState }); }
@@ -213,4 +248,4 @@ async function updateSyncState(patch, runId) { const { syncState = {} } = await 
 function normalizeSyncState(value) { if (!value || value.status !== "running") return value || null; const age=Date.now()-Date.parse(value.updatedAt||value.startedAt||0),running=activeRuns.get(value.source),missingRun=!running||running.runId!==value.runId; return missingRun||age>2*60*1000?{...value,status:"error",phase:"done",detail:"",error:"上次同步已中断，请重新运行",finishedAt:new Date().toISOString()}:value; }
 async function activeTab() { const [tab] = await chrome.tabs.query({ active: true, currentWindow: true }); return tab; }
 function databaseMap(settings){const ids={...(settings.notionDatabaseIds||{})};if(!ids.clip&&settings.notionDatabaseId)ids.clip=settings.notionDatabaseId;return ids;}
-function sourceLabel(source){return({clip:"网页剪藏",weread:"微信读书",douban:"豆瓣",weibo:"微博"})[source]||source;}
+function sourceLabel(source){return({clip:"网页剪藏",weread:"微信读书",douban:"豆瓣用户",doubanMovieTop250:"电影 Top 250",doubanBookTop250:"图书 Top 250",doubanMusicTop250:"音乐 Top 250",weibo:"微博"})[source]||source;}

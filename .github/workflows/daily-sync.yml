@@ -41,7 +41,7 @@ jobs:
   douban:
     if: ${{ github.event_name == 'schedule' || inputs.source == 'all' || inputs.source == 'douban' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -54,6 +54,9 @@ jobs:
           TUNNEST_LICENSE_KEY: ${{ secrets.TUNNEST_LICENSE_KEY }}
           NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
           NOTION_DOUBAN_DATABASE_ID: ${{ secrets.NOTION_DOUBAN_DATABASE_ID }}
+          NOTION_DOUBAN_MOVIE_TOP250_DATABASE_ID: ${{ secrets.NOTION_DOUBAN_MOVIE_TOP250_DATABASE_ID }}
+          NOTION_DOUBAN_BOOK_TOP250_DATABASE_ID: ${{ secrets.NOTION_DOUBAN_BOOK_TOP250_DATABASE_ID }}
+          NOTION_DOUBAN_MUSIC_TOP250_DATABASE_ID: ${{ secrets.NOTION_DOUBAN_MUSIC_TOP250_DATABASE_ID }}
           NOTION_DATABASE_ID: ${{ secrets.NOTION_DATABASE_ID }}
           DOUBAN_USER_ID: ${{ secrets.DOUBAN_USER_ID }}
           DOUBAN_AUTH_TOKEN: ${{ secrets.DOUBAN_AUTH_TOKEN }}
