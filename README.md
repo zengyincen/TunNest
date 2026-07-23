@@ -1,5 +1,3 @@
-<p align="center"><strong>English</strong> · <a href="README.zh-CN.md">简体中文</a></p>
-
 <div align="center">
   <img src="brand/tunnest-icon.svg" width="96" height="96" alt="TunNest icon">
   <h1>TunNest</h1>
@@ -21,6 +19,8 @@
     <a href="#cloudflare-license-service">Cloudflare</a> ·
     <a href="#github-actions-daily-sync">Daily sync</a> ·
     <a href="#troubleshooting">Troubleshooting</a>
+    <strong><ins>English</ins></strong> · 
+    <a href="README.zh-CN.md">简体中文</a>
   </p>
 </div>
 
