@@ -6,8 +6,8 @@ flowchart LR
   G["GitHub Actions\n微信读书 / 豆瓣"] -->|"分别写入专属数据库"| N
   B -. "可选：电影片名 + 年份" .-> T["TMDB API / image CDN"]
   G -. "可选：电影片名 + 年份" .-> T
-  B -. "可选：Subject ID 封面短链" .-> H["dou.img.lithub.cc"]
-  G -. "可选：Subject ID 封面短链" .-> H
+  B -. "默认：Subject ID 封面短链" .-> H["dbimg.imnotfound.eu.org"]
+  G -. "默认：Subject ID 封面短链" .-> H
   B -->|"试用/许可证 + 随机安装码 + 豆瓣封面 URL"| L["Cloudflare License Worker"]
   G -->|"付费许可证 + 固定 Actions 槽位 + 豆瓣封面 URL"| L
   L --> D[("D1\n试用期限 / 许可证哈希 / 安装码哈希")]
@@ -22,7 +22,7 @@ flowchart LR
 - 许可证原文不写 D1，只写 SHA-256 哈希。所有付费套餐包含 3 个浏览器安装槽位，GitHub Actions 另有 1 个独立槽位，不挤占浏览器额度。
 - GitHub Actions 只执行适合稳定 GET/POST 的微信读书 Gateway、豆瓣用户收藏和三个 Top 250 公开榜单同步。
 - 可选 TMDB 模式只为电影补充海报，Token 分别保存在浏览器本地或 GitHub Secret；扩展只接受片名和年份的精确匹配，不把 Token 发送给 Cloudflare。
-- 可选 LitHub 模式先执行单次健康检查，通过后批量构造电影、图书、音乐短链；检查失败自动回到 Cloudflare 豆瓣代理。
+- 自建镜像模式先执行单次健康检查，通过后批量构造电影、图书、音乐短链；检查失败自动回到 Cloudflare 豆瓣代理。
 - GitHub Actions 不提供试用：许可证在线验证失败时，脚本在读取平台数据和调用 Notion 之前退出。
 - 每个 Notion 页面使用无标题、始终展开的托管内容块保存同步正文；网页剪藏、微信读书、豆瓣和微博都不会显示“TunNest 自动同步区域”，用户在托管块之外手写的内容会保留。
 

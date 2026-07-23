@@ -97,7 +97,7 @@
 
 封面默认使用许可证 Worker 的缓存代理直链写入，豆瓣原始地址保存在“封面原图”。图片不逐张上传到 Notion，也不写入 D1 或对象存储。
 
-如需尝试更短的批量直链，可在“豆瓣封面直链”选择 `LitHub 托管优先`。扩展先请求一次 `https://dou.img.lithub.cc/movie/1292052.jpg` 做健康检查；成功后按媒体类型和豆瓣 Subject ID 为整批内容生成链接，失败则自动回退 Cloudflare。GitHub Actions 对应的 Repository Variable 是 `DOUBAN_IMAGE_PROVIDER=lithub-first`。该服务由第三方维护，不能保证长期在线。
+“豆瓣封面直链”默认选择 `自建镜像优先`。扩展先请求一次 `https://dbimg.imnotfound.eu.org/movie/35337634.jpg` 做健康检查；成功后按媒体类型和豆瓣 Subject ID 为整批内容生成链接，失败则自动回退 Cloudflare。GitHub Actions 默认值同样是 `mirror-first`，也可显式创建 Repository Variable `DOUBAN_IMAGE_PROVIDER=mirror-first`。旧版 `lithub-first` 配置会自动迁移。
 
 ### 可选 TMDB 电影海报
 

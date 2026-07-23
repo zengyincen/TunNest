@@ -4,24 +4,24 @@ import { enrichDoubanHostedCovers, enrichMovieCovers } from "../extension/lib/co
 
 const movie={kind:"movie",externalId:"1292052",title:"肖申克的救赎",coverUrl:"https://img1.doubanio.com/poster.jpg",metadata:{years:"1994"}};
 
-test("builds LitHub short links for all supported Douban media after one health probe",async()=>{
+test("builds self-hosted short links for all supported Douban media after one health probe",async()=>{
   const calls=[],fetchImpl=async(url,init)=>{calls.push({url,init});return{ok:true,status:200,headers:new Headers({"Content-Type":"image/jpeg"}),body:null};};
   const source=[movie,{kind:"book",externalId:"1007305",coverUrl:"https://img.test/book.jpg"},{kind:"music",externalId:"2995812",coverUrl:"https://img.test/music.jpg"}];
-  const result=await enrichDoubanHostedCovers(source,{provider:"lithub-first",fetchImpl});
+  const result=await enrichDoubanHostedCovers(source,{provider:"mirror-first",fetchImpl});
   assert.equal(calls.length,1);
-  assert.equal(result.activeProvider,"lithub");
+  assert.equal(result.activeProvider,"mirror");
   assert.equal(result.replaced,3);
   assert.deepEqual(result.items.map((item)=>item.coverUrl),[
-    "https://dou.img.lithub.cc/movie/1292052.jpg",
-    "https://dou.img.lithub.cc/book/1007305.jpg",
-    "https://dou.img.lithub.cc/music/2995812.jpg"
+    "https://dbimg.imnotfound.eu.org/movie/1292052.jpg",
+    "https://dbimg.imnotfound.eu.org/book/1007305.jpg",
+    "https://dbimg.imnotfound.eu.org/music/2995812.jpg"
   ]);
-  assert.equal(result.items[0].metadata.coverSource,"LitHub");
+  assert.equal(result.items[0].metadata.coverSource,"TunNest Mirror");
 });
 
-test("falls back without changing covers when the LitHub health probe fails",async()=>{
+test("falls back without changing covers when the self-hosted health probe fails",async()=>{
   const messages=[],fetchImpl=async()=>{throw new TypeError("certificate has expired");};
-  const result=await enrichDoubanHostedCovers([movie],{provider:"lithub-first",fetchImpl,onStatus:(value)=>messages.push(value)});
+  const result=await enrichDoubanHostedCovers([movie],{provider:"mirror-first",fetchImpl,onStatus:(value)=>messages.push(value)});
   assert.equal(result.activeProvider,"cloudflare");
   assert.equal(result.items[0],movie);
   assert.match(messages[0],/回退 Cloudflare/);

@@ -5,6 +5,7 @@ const $ = (selector) => document.querySelector(selector);
 const notionSources=["clip","weread","douban","doubanMovieTop250","doubanBookTop250","doubanMusicTop250","weibo"];
 const keys = ["licenseKey","notionToken","notionDatabaseIds","notionDatabaseId","wereadApiKey","doubanUserId","doubanAuthToken","doubanImageProvider","movieCoverProvider","tmdbAccessToken","weiboUids","weiboPages"];
 const stored = await chrome.storage.local.get(keys);
+if(stored.doubanImageProvider==="lithub-first"){stored.doubanImageProvider="mirror-first";await chrome.storage.local.set({doubanImageProvider:"mirror-first"});}
 for (const key of ["licenseKey","notionToken","wereadApiKey","doubanUserId","doubanAuthToken","doubanImageProvider","movieCoverProvider","tmdbAccessToken","weiboUids","weiboPages"]) if ($(`#${key}`)) $(`#${key}`).value = stored[key] || $(`#${key}`).value || "";
 const notionDatabaseIds={...(stored.notionDatabaseIds||{})};if(!notionDatabaseIds.clip&&stored.notionDatabaseId)notionDatabaseIds.clip=stored.notionDatabaseId;
 for(const source of notionSources)$(`#${source}DatabaseId`).value=notionDatabaseIds[source]||"";

@@ -15,7 +15,7 @@ if(source==="all"||source==="weread"){
   failedCount+=await syncSource("weread",databaseId("WEREAD"),items);
 }
 if(source==="all"||source==="douban"){
-  const provider=process.env.MOVIE_COVER_PROVIDER||"douban",tmdbAccessToken=process.env.TMDB_ACCESS_TOKEN,doubanImageProvider=process.env.DOUBAN_IMAGE_PROVIDER||"cloudflare";
+  const provider=process.env.MOVIE_COVER_PROVIDER||"douban",tmdbAccessToken=process.env.TMDB_ACCESS_TOKEN,doubanImageProvider=process.env.DOUBAN_IMAGE_PROVIDER||"mirror-first";
   const hostedUser=await enrichDoubanHostedCovers(await getDoubanItems({userId:required("DOUBAN_USER_ID"),authToken:process.env.DOUBAN_AUTH_TOKEN,apiHost:process.env.DOUBAN_API_HOST}),{provider:doubanImageProvider,onStatus:console.log});
   const userResult=await enrichMovieCovers(hostedUser.items,{provider,tmdbAccessToken,onProgress:tmdbProgress});
   const items=userResult.items;

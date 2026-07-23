@@ -1,18 +1,19 @@
 const TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p/w500";
-const LITHUB_IMAGE_BASE = "https://dou.img.lithub.cc";
+const DOUBAN_MIRROR_BASE = "https://dbimg.imnotfound.eu.org";
 const CACHE_MAX_AGE = 30 * 24 * 60 * 60 * 1000;
 const CONCURRENCY = 5;
-let litHubProbe;
+let doubanMirrorProbe;
 
 export const MOVIE_COVER_PROVIDERS = ["douban", "tmdb-first", "tmdb-fallback"];
-export const DOUBAN_IMAGE_PROVIDERS = ["cloudflare", "lithub-first"];
+export const DOUBAN_IMAGE_PROVIDERS = ["mirror-first", "cloudflare", "lithub-first"];
 
 export async function enrichDoubanHostedCovers(items, options = {}) {
-  const provider = DOUBAN_IMAGE_PROVIDERS.includes(options.provider) ? options.provider : "cloudflare";
-  if (provider !== "lithub-first") return { items, activeProvider: "cloudflare", replaced: 0 };
-  const health = await litHubAvailable(options.fetchImpl || fetch, options.signal);
+  const configured = DOUBAN_IMAGE_PROVIDERS.includes(options.provider) ? options.provider : "mirror-first";
+  const provider = configured === "lithub-first" ? "mirror-first" : configured;
+  if (provider !== "mirror-first") return { items, activeProvider: "cloudflare", replaced: 0 };
+  const health = await doubanMirrorAvailable(options.fetchImpl || fetch, options.signal);
   if (!health.ok) {
-    await options.onStatus?.(`LitHub 封面源不可用，已回退 Cloudflare：${health.error}`);
+    await options.onStatus?.(`自建封面镜像不可用，已回退 Cloudflare：${health.error}`);
     return { items, activeProvider: "cloudflare", replaced: 0, error: health.error };
   }
   let replaced = 0;
@@ -22,12 +23,12 @@ export async function enrichDoubanHostedCovers(items, options = {}) {
     replaced++;
     return {
       ...item,
-      coverUrl: `${LITHUB_IMAGE_BASE}/${kind}/${id}.jpg`,
-      metadata: { ...(item.metadata || {}), coverSource: "LitHub", originalCoverUrl: item.coverUrl || "" }
+      coverUrl: `${DOUBAN_MIRROR_BASE}/${kind}/${id}.jpg`,
+      metadata: { ...(item.metadata || {}), coverSource: "TunNest Mirror", originalCoverUrl: item.coverUrl || "" }
     };
   });
-  await options.onStatus?.(`已启用 LitHub 托管封面 · ${replaced} 条`);
-  return { items: output, activeProvider: "lithub", replaced };
+  await options.onStatus?.(`已启用自建封面镜像 · ${replaced} 条`);
+  return { items: output, activeProvider: "mirror", replaced };
 }
 
 export async function enrichMovieCovers(items, options = {}) {
@@ -102,16 +103,16 @@ function pruneCache(cache) {
   const fresh = Object.entries(cache).filter(([, value]) => Date.now() - Date.parse(value?.fetchedAt || 0) < CACHE_MAX_AGE);
   return Object.fromEntries(fresh.slice(-1000));
 }
-async function litHubAvailable(fetchImpl, signal) {
-  if (!litHubProbe || litHubProbe.fetchImpl !== fetchImpl || Date.now() - litHubProbe.checkedAt > 10 * 60 * 1000) litHubProbe = { fetchImpl, checkedAt: Date.now(), promise: (async () => {
+async function doubanMirrorAvailable(fetchImpl, signal) {
+  if (!doubanMirrorProbe || doubanMirrorProbe.fetchImpl !== fetchImpl || Date.now() - doubanMirrorProbe.checkedAt > 10 * 60 * 1000) doubanMirrorProbe = { fetchImpl, checkedAt: Date.now(), promise: (async () => {
     try {
-      const response = await fetchImpl(`${LITHUB_IMAGE_BASE}/movie/1292052.jpg`, { signal, cache: "no-store", headers: { Accept: "image/*", Range: "bytes=0-0" } });
+      const response = await fetchImpl(`${DOUBAN_MIRROR_BASE}/movie/35337634.jpg`, { signal, cache: "no-store", headers: { Accept: "image/*", Range: "bytes=0-0" } });
       const type = String(response.headers?.get?.("Content-Type") || "").toLowerCase();
       await response.body?.cancel?.().catch?.(() => {});
       return response.ok && type.startsWith("image/") ? { ok: true } : { ok: false, error: `HTTP ${response.status}${type ? ` · ${type}` : ""}` };
     } catch (error) { return { ok: false, error: error.message || "网络连接失败" }; }
   })() };
-  return litHubProbe.promise;
+  return doubanMirrorProbe.promise;
 }
 function throwIfAborted(signal) { if (signal?.aborted) throw new Error("同步已停止"); }
 function pause(milliseconds, signal) { return new Promise((resolve, reject) => { const timer = setTimeout(resolve, milliseconds); signal?.addEventListener("abort", () => { clearTimeout(timer); reject(new Error("同步已停止")); }, { once: true }); }); }
