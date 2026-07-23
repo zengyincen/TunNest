@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 import { NOTION_DATABASE_SCHEMAS, syncItems, verifyNotion } from "../extension/lib/notion.js";
 
 const background=readFileSync(new URL("../extension/background.js",import.meta.url),"utf8");
+const manifest=JSON.parse(readFileSync(new URL("../extension/manifest.json",import.meta.url),"utf8"));
 const options=readFileSync(new URL("../extension/options.html",import.meta.url),"utf8");
 const workflow=readFileSync(new URL("../.github/workflows/daily-sync.yml",import.meta.url),"utf8");
 const notionClient=readFileSync(new URL("../extension/lib/notion.js",import.meta.url),"utf8");
@@ -46,6 +47,13 @@ test("uses separate WeRead and Douban database secrets in Actions",()=>{
   assert.match(workflow,/NOTION_DOUBAN_MUSIC_TOP250_DATABASE_ID/);
 });
 
+test("allows Douban artwork downloads with an anti-hotlinking header rule",()=>{
+  assert.ok(manifest.host_permissions.includes("https://*.doubanio.com/*"));
+  assert.match(background,/DOUBAN_IMAGE_HEADER_RULE_ID/);
+  assert.match(background,/requestDomains:\s*\["doubanio\.com"\]/);
+  assert.match(background,/value:\s*"https:\/\/www\.douban\.com\/"/);
+});
+
 test("uses Notion-supported emoji icons in block payloads",()=>{
   assert.doesNotMatch(notionClient,/emoji:\s*"(?:✦|◌)"/);
   assert.match(notionClient,/emoji:\s*"💡"/);
@@ -84,6 +92,57 @@ test("writes a Top 250 entry as property-only structured data",async()=>{
     assert.equal(payload.properties["评分"].number,9.7);
     assert.equal(payload.properties["评价人数"].number,3306537);
     assert.equal(payload.properties["推荐语"].rich_text[0].text.content,"希望让人自由。");
+  }finally{globalThis.fetch=previousFetch;}
+});
+
+test("downloads a Douban cover and stores it in Notion instead of hotlinking",async()=>{
+  const previousFetch=globalThis.fetch,calls=[],coverUrl="https://img1.doubanio.com/view/photo/s_ratio_poster/public/p480747492.jpg";
+  globalThis.fetch=async(url,init={})=>{
+    calls.push({url:String(url),init});
+    const value=String(url);
+    if(value===coverUrl)return{ok:true,status:200,blob:async()=>new Blob(["douban-cover"],{type:"image/jpeg"})};
+    let data={};
+    if(value.endsWith("/query"))data={results:[]};
+    else if(value.includes("/databases/")&&init.method!=="PATCH")data=databaseData("doubanMovieTop250","e".repeat(32));
+    else if(value.endsWith("/file_uploads"))data={id:"douban-upload",status:"pending"};
+    else if(value.endsWith("/file_uploads/douban-upload/send"))data={id:"douban-upload",status:"uploaded"};
+    else if(value.endsWith("/pages"))data={id:"douban-page"};
+    return{ok:true,status:200,json:async()=>data};
+  };
+  try{
+    const result=await syncItems("token","e".repeat(32),[{kind:"movie",externalId:"1292052",title:"肖申克的救赎",url:"https://movie.douban.com/subject/1292052/",coverUrl,tags:["豆瓣"],capturedAt:"2026-07-23T00:00:00Z",metadata:{rank:1}}],"doubanMovieTop250");
+    assert.equal(result[0].ok,true);
+    const download=calls.find(call=>call.url===coverUrl);
+    assert.equal(download.init.headers.Referer,"https://www.douban.com/");
+    const send=calls.find(call=>call.url.endsWith("/file_uploads/douban-upload/send"));
+    assert.ok(send.init.body instanceof FormData);
+    const create=calls.find(call=>call.url.endsWith("/pages"));
+    const payload=JSON.parse(create.init.body);
+    assert.deepEqual(payload.properties["封面"],{files:[{name:"封面",type:"file_upload",file_upload:{id:"douban-upload"}}]});
+    assert.deepEqual(payload.cover,{type:"file_upload",file_upload:{id:"douban-upload"}});
+    assert.equal(create.init.headers["Notion-Version"],"2026-03-11");
+  }finally{globalThis.fetch=previousFetch;}
+});
+
+test("does not upload an already Notion-hosted Douban cover again",async()=>{
+  const previousFetch=globalThis.fetch,calls=[],coverUrl="https://img2.doubanio.com/view/photo/s_ratio_poster/public/p2913554676.jpg";
+  globalThis.fetch=async(url,init={})=>{
+    calls.push({url:String(url),init});
+    const value=String(url);
+    let data={};
+    if(value.endsWith("/query"))data={results:[{id:"existing-douban",properties:{"封面":{files:[{type:"file",file:{url:"https://prod-files-secure.s3.us-west-2.amazonaws.com/cover.jpg"}}]}}}]};
+    else if(value.includes("/databases/")&&init.method!=="PATCH")data=databaseData("doubanBookTop250","f".repeat(32));
+    return{ok:true,status:200,json:async()=>data};
+  };
+  try{
+    const result=await syncItems("token","f".repeat(32),[{kind:"book",externalId:"book-1",title:"测试书",url:"https://book.douban.com/subject/1/",coverUrl,tags:["豆瓣"],capturedAt:"2026-07-23T00:00:00Z",metadata:{rank:1}}],"doubanBookTop250");
+    assert.equal(result[0].ok,true);
+    assert.equal(calls.some(call=>call.url===coverUrl),false);
+    assert.equal(calls.some(call=>call.url.endsWith("/file_uploads")),false);
+    const update=calls.find(call=>call.url.endsWith("/pages/existing-douban"));
+    const payload=JSON.parse(update.init.body);
+    assert.equal(payload.properties["封面"],undefined);
+    assert.equal(payload.cover,undefined);
   }finally{globalThis.fetch=previousFetch;}
 });
 

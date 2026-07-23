@@ -107,17 +107,36 @@ async function upsertItem(token, databaseId, item, source, context = {}) {
   const { signal, onDetail = () => {} } = context;
   const externalId = String(item.externalId || item.url || item.title).slice(0, 1900);
   const query = await notion(token, `/databases/${databaseId}/query`, withSignal({ method: "POST", body: JSON.stringify({ filter: { property: "外部 ID", rich_text: { equals: externalId } }, page_size: 1 }) }, signal));
+  const existingPage = query.results?.[0];
   const properties = propertiesFor(item, externalId, source);
-  const cover = pageCover(item);
-  if (query.results?.[0]) {
-    await notion(token, `/pages/${query.results[0].id}`, withSignal({ method: "PATCH", body: JSON.stringify({ properties, ...(cover ? { cover } : {}) }) }, signal));
-    if (isTop250Source(source)) return query.results[0].id;
-    if (source === "weibo") await syncUploadedImages(token, query.results[0].id, item, context);
-    await onDetail("正在更新正文");
-    await replaceManagedBlocks(token, query.results[0].id, item, signal);
-    return query.results[0].id;
+  let cover = pageCover(item), version = VERSION;
+  if (isDoubanSource(source) && isDoubanImageUrl(representativeImageUrl(item))) {
+    if (hasNotionHostedCover(existingPage)) {
+      delete properties["封面"];
+      cover = null;
+    } else {
+      try {
+        await onDetail("正在上传豆瓣封面");
+        const fileUploadId = await uploadImage(token, representativeImageUrl(item), 0, signal, (detail) => onDetail(`豆瓣封面 · ${detail}`), "douban");
+        properties["封面"] = uploadedImageFiles(fileUploadId);
+        cover = uploadedPageCover(fileUploadId);
+        version = FILE_VERSION;
+      } catch (error) {
+        if (signal?.aborted) throw error;
+        console.warn("豆瓣封面上传失败，保留原图链接", error);
+        await onDetail("封面上传失败，保留原图链接");
+      }
+    }
   }
-  const page = await notion(token, "/pages", withSignal({ method: "POST", body: JSON.stringify({ parent: { database_id: databaseId }, properties, ...(cover ? { cover } : {}), ...(!isTop250Source(source) ? { children: [managedBlock(item)] } : {}) }) }, signal));
+  if (existingPage) {
+    await notion(token, `/pages/${existingPage.id}`, withSignal({ method: "PATCH", body: JSON.stringify({ properties, ...(cover ? { cover } : {}) }) }, signal), version);
+    if (isTop250Source(source)) return existingPage.id;
+    if (source === "weibo") await syncUploadedImages(token, existingPage.id, item, context);
+    await onDetail("正在更新正文");
+    await replaceManagedBlocks(token, existingPage.id, item, signal);
+    return existingPage.id;
+  }
+  const page = await notion(token, "/pages", withSignal({ method: "POST", body: JSON.stringify({ parent: { database_id: databaseId }, properties, ...(cover ? { cover } : {}), ...(!isTop250Source(source) ? { children: [managedBlock(item)] } : {}) }) }, signal), version);
   if (source === "weibo") await syncUploadedImages(token, page.id, item, context);
   return page.id;
 }
@@ -244,29 +263,36 @@ async function syncUploadedImages(token, pageId, item, context = {}) {
   for (const block of [...managedImages, ...managedFallbacks]) await notion(token, `/blocks/${block.id}`, withSignal({ method: "DELETE" }, signal));
 }
 
-async function uploadImage(token, url, index, signal, onDetail = () => {}) {
+async function uploadImage(token, url, index, signal, onDetail = () => {}, source = "weibo") {
+  const label = source === "douban" ? "豆瓣封面" : "微博配图";
   let parsed;
-  try { parsed = new URL(url); } catch { throw new Error(`微博配图地址无效：${url}`); }
-  if (!/(^|\.)sinaimg\.cn$/i.test(parsed.hostname)) throw new Error(`不支持的微博配图域名：${parsed.hostname}`);
-  const filenameBase = `tunnest-weibo-${index + 1}`;
+  try { parsed = new URL(url); } catch { throw new Error(`${label}地址无效：${url}`); }
+  const supported = source === "douban" ? isDoubanImageUrl(url) : /(^|\.)sinaimg\.cn$/i.test(parsed.hostname);
+  if (!supported) throw new Error(`不支持的${label}域名：${parsed.hostname}`);
+  const filenameBase = `tunnest-${source === "douban" ? "douban-cover" : "weibo"}-${index + 1}`;
   let downloadFailure = "";
   try {
     await onDetail("正在下载原图");
+    const headers = { Accept: "image/avif,image/webp,image/apng,image/*,*/*;q=0.8" };
+    if (source === "douban") {
+      headers.Referer = "https://www.douban.com/";
+      headers["User-Agent"] = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/138.0 Safari/537.36";
+    }
     const { response, body: sourceBlob } = await timedFetch(
       url,
-      withSignal({ credentials: "omit", cache: "no-store", headers: { Accept: "image/avif,image/webp,image/apng,image/*,*/*;q=0.8" } }, signal),
+      withSignal({ credentials: "omit", cache: "no-store", headers }, signal),
       45000,
-      "微博配图下载",
+      `${label}下载`,
       (value) => value.ok ? value.blob() : null
     );
-    if (!response.ok) throw new Error(`微博配图下载失败 (${response.status})`);
+    if (!response.ok) throw new Error(`${label}下载失败 (${response.status})`);
     const declaredType = normalizeImageType(sourceBlob.type);
-    if (sourceBlob.type && !declaredType) throw new Error(`微博返回的不是图片（${sourceBlob.type}）`);
+    if (sourceBlob.type && !declaredType) throw new Error(`${label}返回的不是图片（${sourceBlob.type}）`);
     const contentType = declaredType || imageTypeFromPath(parsed.pathname);
-    if (!contentType) throw new Error(`微博配图格式异常：${sourceBlob.type || "未知类型"}`);
-    if (!sourceBlob.size) throw new Error("微博返回了空图片");
+    if (!contentType) throw new Error(`${label}格式异常：${sourceBlob.type || "未知类型"}`);
+    if (!sourceBlob.size) throw new Error(`${label}返回了空图片`);
     const blob = sourceBlob.type === contentType ? sourceBlob : sourceBlob.slice(0, sourceBlob.size, contentType);
-    if (blob.size > 20 * 1024 * 1024) throw new Error("单张微博配图超过 Notion 20MB 上传限制");
+    if (blob.size > 20 * 1024 * 1024) throw new Error(`单张${label}超过 Notion 20MB 上传限制`);
     const filename = `${filenameBase}.${imageExtension(contentType, parsed.pathname)}`;
     await onDetail("正在上传至 Notion");
     const upload = await notion(token, "/file_uploads", {
@@ -293,7 +319,7 @@ async function uploadImage(token, url, index, signal, onDetail = () => {}) {
     if (imported.status === "uploaded") return imported.id;
     importFailure = imported.file_import_result || imported.status || "导入超时";
   } catch (error) { if (signal?.aborted) throw error; importFailure = error.message; }
-  throw new Error(`${downloadFailure || "微博配图下载失败"}；Notion 远程导入失败（${importFailure || "未知原因"}）`);
+  throw new Error(`${downloadFailure || `${label}下载失败`}；Notion 远程导入失败（${importFailure || "未知原因"}）`);
 }
 
 async function notion(token, path, init = {}, version = VERSION) {
@@ -310,6 +336,7 @@ async function notion(token, path, init = {}, version = VERSION) {
 }
 function sourceSchema(source) { const schema = NOTION_DATABASE_SCHEMAS[source]; if (!schema) throw new Error("未知 Notion 数据库类型"); return schema; }
 function isTop250Source(source) { return ["doubanMovieTop250", "doubanBookTop250", "doubanMusicTop250"].includes(source); }
+function isDoubanSource(source) { return source === "douban" || isTop250Source(source); }
 function rich(value, max = 2000) { return value ? [{ type: "text", text: { content: String(value).slice(0, max) } }] : []; }
 function split(value) { return String(value).split(/\n{2,}/).map((part) => part.trim()).filter(Boolean).flatMap((part) => part.match(/[\s\S]{1,1900}/g) || []); }
 function notionId(value) { const match = String(value || "").match(/[0-9a-f]{32}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i); if (!match) throw new Error("Notion 页面或数据库 ID 无效"); return match[0]; }
@@ -325,6 +352,10 @@ function imageTypeFromPath(pathname) { return ({ jpg: "image/jpeg", jpeg: "image
 function imageFallbackBlock(image) { return { object: "block", type: "paragraph", paragraph: { rich_text: [{ type: "text", text: { content: `${MANAGED_IMAGE_CAPTION}配图上传失败 · ${image.caption}（打开原图）`, link: { url: image.url } } }] } }; }
 function top250Properties() { return { "名称": { title: {} }, "封面": { files: {} }, "排名": { number: {} }, "评分": { number: {} }, "评价人数": { number: {} }, "信息": { rich_text: {} }, "推荐语": { rich_text: {} }, "原条目": { url: {} }, "标签": { multi_select: {} }, "抓取时间": { date: {} }, "外部 ID": { rich_text: {} } }; }
 function representativeImageUrl(item) { const image=(item.images||[])[0],value=typeof image==="string"?image:image?.url;return normalizeImageUrl(item.coverUrl||value); }
+function isDoubanImageUrl(value) { try { return /(^|\.)doubanio\.com$/i.test(new URL(value).hostname); } catch { return false; } }
+function hasNotionHostedCover(page) { return (page?.properties?.["封面"]?.files || []).some((file) => file.type === "file" || file.type === "file_upload"); }
+function uploadedPageCover(id) { return { type: "file_upload", file_upload: { id } }; }
+function uploadedImageFiles(id) { return { files: [{ name: "封面", type: "file_upload", file_upload: { id } }] }; }
 function normalizeImageUrl(value) { const normalized=String(value||"").trim().replace(/^http:/i,"https:").replace(/^\/\//,"https://");if(!normalized)return "";try{const url=new URL(normalized);return url.protocol==="https:"&&url.href.length<=2000?url.href:"";}catch{return "";} }
 function pageCover(item) { const url=representativeImageUrl(item);return url?{type:"external",external:{url}}:null; }
 function imageFiles(item) { const url=representativeImageUrl(item);return{files:url?[{name:"封面",type:"external",external:{url}}]:[]}; }
