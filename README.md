@@ -1,83 +1,68 @@
 <div align="center">
-  <img src="brand/tunnest-icon.svg" width="96" height="96" alt="TunNest icon">
-  <h1>TunNest</h1>
-  <p><strong>A private nest for everything worth keeping.</strong></p>
-  <p>Save WeRead notes, Douban collections, Weibo posts, and clipped web pages to your own Notion workspace.</p>
+  <img src="brand/tunnest-icon.svg" width="96" height="96" alt="囤囤 TunNest 图标">
+  <h1>囤囤 TunNest</h1>
+  <p><strong>把散落的喜欢，收进自己的数字巢穴。</strong></p>
+  <p>微信读书、豆瓣、微博与网页剪藏，一站同步到你自己的 Notion。</p>
 
   <p>
     <a href="https://github.com/zengyincen/TunNest/actions/workflows/ci.yml"><img src="https://github.com/zengyincen/TunNest/actions/workflows/ci.yml/badge.svg" alt="TunNest CI"></a>
     <img src="https://img.shields.io/badge/release-v1.4.4-1D1D1F?style=flat-square" alt="Release v1.4.4">
     <img src="https://img.shields.io/badge/Chrome-Manifest_V3-4285F4?style=flat-square&logo=googlechrome&logoColor=white" alt="Chrome Manifest V3">
-    <img src="https://img.shields.io/badge/sources-4-30D158?style=flat-square" alt="4 content sources">
-    <img src="https://img.shields.io/badge/full_trial-7_days-FF9F0A?style=flat-square" alt="7-day full trial">
+    <img src="https://img.shields.io/badge/同步来源-4-30D158?style=flat-square" alt="4 个同步来源">
+    <img src="https://img.shields.io/badge/完整试用-7_天-FF9F0A?style=flat-square" alt="7 天完整试用">
     <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-6E6E73?style=flat-square" alt="MIT License"></a>
   </p>
 
   <p>
-    <a href="#quick-start">Quick start</a> ·
-    <a href="#notion-setup">Notion setup</a> ·
-    <a href="#cloudflare-license-service">Cloudflare</a> ·
-    <a href="#github-actions-daily-sync">Daily sync</a> ·
-    <a href="#troubleshooting">Troubleshooting</a> ·
-    <strong>English</strong> · 
-    <a href="README.zh-CN.md">简体中文</a>
+    <a href="#快速开始">快速开始</a> ·
+    <a href="#完整部署教程">完整部署</a> ·
+    <a href="#notion-完整配置">Notion 配置</a> ·
+    <a href="#github-actions-每日同步">每日同步</a> ·
+    <a href="#常见问题与排错">排错</a>
   </p>
 </div>
 
-![TunNest: a private nest for everything worth keeping](brand/readme-hero.svg)
+![囤囤 TunNest：把散落的喜欢收进自己的数字巢穴](brand/readme-hero.svg)
 
 > [!IMPORTANT]
-> TunNest is an early-stage, independently maintained project. WeRead, Douban, and Weibo may change their APIs, page structure, signatures, or risk controls without notice. Only archive content you are entitled to access, and follow the terms of each source platform.
+> TunNest 仍处于早期版本。微信读书、豆瓣和微博的接口、页面结构及风控规则可能随时变化。请只同步你有权访问和保存的内容，并遵守对应平台条款。
 
-## What is TunNest?
+## 囤囤是什么
 
-TunNest is a Chrome browser extension and a set of optional GitHub Actions that move saved content into databases owned by you. It is not another reading or social platform. Your notes, collections, posts, and clips remain searchable and editable in your own Notion workspace.
+囤囤不是另一个内容平台，而是一条通往私人资料库的路。它把四种来源整理进七个 Notion 数据库，让读过的书、看过的电影、喜欢的博文、三套豆瓣 Top 250 和网页收藏真正可搜索、可整理、可长期回顾。
 
-| Source | What TunNest saves | Browser extension | GitHub Actions |
+| 来源 | 保存内容 | 浏览器扩展 | GitHub Actions |
 |---|---|:---:|:---:|
-| WeRead | Books, covers, highlights, and notes | ✅ Browser login or Gateway | ✅ Gateway API key required |
-| Douban | User book/movie interests plus Movie, Book, and Music Top 250 | ✅ Signed requests and public-page parsing | ✅ Supported |
-| Weibo | User posts, full long-form text, reposts, original images, and engagement counts | ✅ Reuses browser login | — Intentionally excluded |
-| Web pages | Metadata, article text, selection, images, video, audio, and source URL | ✅ One-click clipping | — Requires an active page |
+| 微信读书 | 书籍、封面、划线、笔记 | ✅ 浏览器登录或 Gateway | ✅ 需要 Gateway API Key |
+| 豆瓣 | 用户书影收藏 + 电影 / 图书 / 音乐 Top 250 | ✅ 自动签名与榜单抓取 | ✅ 自动签名与榜单抓取 |
+| 微博 | 用户博文、完整长文、转发内容、原图配图、互动数据 | ✅ 浏览器登录态 | — 不适合无人值守抓取 |
+| 任意网页 | 标题、正文、选区、作者、原文链接、封面 | ✅ 一键剪藏 | — 需要用户主动选择页面 |
 
 <table>
   <tr>
-    <td align="center"><strong>4</strong><br><sub>content sources</sub></td>
-    <td align="center"><strong>7</strong><br><sub>separate Notion databases</sub></td>
-    <td align="center"><strong>7 days</strong><br><sub>full-feature trial</sub></td>
-    <td align="center"><strong>3</strong><br><sub>browser device slots</sub></td>
-    <td align="center"><strong>1</strong><br><sub>Actions repository slot</sub></td>
-    <td align="center"><strong>Daily</strong><br><sub>WeRead and Douban sync</sub></td>
+    <td align="center"><strong>4</strong><br><sub>类收藏来源</sub></td>
+    <td align="center"><strong>7</strong><br><sub>套独立 Notion 数据库</sub></td>
+    <td align="center"><strong>7 天</strong><br><sub>新用户完整试用</sub></td>
+    <td align="center"><strong>3 台</strong><br><sub>付费浏览器设备</sub></td>
+    <td align="center"><strong>1 个</strong><br><sub>Actions 仓库槽位</sub></td>
+    <td align="center"><strong>每天 1 次</strong><br><sub>微信读书 / 豆瓣同步</sub></td>
   </tr>
 </table>
 
-![TunNest data flow](brand/readme-flow.svg)
+![囤囤的数据流](brand/readme-flow.svg)
 
-TunNest is designed for heavy WeRead and Notion users, readers and film lovers, fandom archivists, digital collectors, and anyone who wants saved content to end up somewhere they control.
+它适合微信读书和 Notion 重度用户、书影音爱好者、追星与内容收藏用户、文艺青年、网页仓鼠派，以及希望数据最终回到自己手里的人。
 
-## Highlights
+## 快速开始
 
-- Four independent browser workflows: web clipping, WeRead, Douban, and Weibo.
-- Seven purpose-built Notion databases with automatic schema creation and migration.
-- Full Weibo long-post text and original images, including reposted content.
-- Web clipping with article images, video, and audio. Media is imported into Notion when possible.
-- Douban user collections and three structured Top 250 databases.
-- Optional TMDB poster matching with a 30-day local cache.
-- Content fingerprints skip unchanged records and update only when meaningful data changes.
-- Persistent sync progress: closing the popup does not hide or restart the job.
-- Dynamic Cloudflare license verification; no license public key is embedded in the extension.
-- Optional scheduled GitHub Actions for sources that are suitable for unattended GET/POST synchronization.
+1. 从 [Releases](https://github.com/zengyincen/TunNest/releases) 下载最新扩展 ZIP；如果暂时没有 Release，按下面命令自己打包。
+2. 解压 `tunnest-extension.zip`。
+3. 打开 Chrome 的 `chrome://extensions`。
+4. 开启右上角“开发者模式”，点击“加载已解压的扩展程序”。
+5. 选择解压后的 `tunnest-extension` 文件夹。
+6. 打开扩展设置，配置 Notion，然后开始 7 天完整试用。
 
-## Quick start
-
-1. Download the latest extension archive from [GitHub Releases](https://github.com/zengyincen/TunNest/releases/latest).
-2. Extract `tunnest-extension.zip`.
-3. Open `chrome://extensions` in Chrome or another Chromium browser.
-4. Enable **Developer mode**.
-5. Click **Load unpacked** and choose the extracted `tunnest-extension` directory.
-6. Open TunNest settings, connect Notion, and start the seven-day full trial.
-
-To build the extension yourself:
+自己打包：
 
 ```bash
 git clone https://github.com/zengyincen/TunNest.git
@@ -88,576 +73,579 @@ npm run check
 npm run package
 ```
 
-The build produces:
+打包结果位于：
 
 ```text
-dist/tunnest-extension/       # Load this directory in Chrome
-dist/tunnest-extension.zip    # Upload this file to a GitHub Release
+dist/tunnest-extension/       # 可直接在 Chrome 加载
+dist/tunnest-extension.zip    # 可上传到 GitHub Release
 ```
 
 > [!TIP]
-> After updating the source, open `chrome://extensions` and click **Reload** on TunNest. Close and reopen the popup if an older UI is still visible.
+> 更新源码后，在 `chrome://extensions` 找到囤囤并点击“重新加载”。如果仍看到旧设置页面，请先关闭旧弹窗再重新打开。
 
-## Notion setup
 
-TunNest uses one Notion Internal Integration token and seven databases:
 
-- one database for clipped web pages;
-- one database for WeRead;
-- four databases under the Douban parent page: user interests, Movie Top 250, Book Top 250, and Music Top 250;
-- one database for Weibo.
+## Notion 完整配置
 
-The four source groups may live under four different Notion parent pages.
+囤囤共用一个 Notion Internal Integration Token，共连接七个数据库：网页、微信读书、微博各一个，豆瓣父页面下四个。四类来源可以位于四个不同父页面。
 
-### 1. Create a Notion integration
+### 1. 创建 Notion Integration
 
-1. Open [Notion Integrations](https://www.notion.so/my-integrations).
-2. Create an **Internal Integration** in the target workspace.
-3. Enable read, insert, and update content capabilities.
-4. Copy the token beginning with `ntn_…` or `secret_…`.
+1. 打开 [Notion Integrations](https://www.notion.so/my-integrations)。
+2. 点击创建新的 Internal Integration。
+3. 选择目标工作区。
+4. 开启读取内容、插入内容和更新内容权限。
+5. 复制 `ntn_…` 或 `secret_…` 开头的 Internal Integration Token。
 
-Treat this token as a password. Never commit it to Git or paste it into an issue.
+Token 相当于进入数据库的钥匙，不要提交到 GitHub 源码，也不要发到 Issue。
 
-### 2. Create and share parent pages
+### 2. 创建并授权四个父页面
 
-Create four empty Notion pages, for example:
+建议在 Notion 新建四个空白页面：
 
-- TunNest · Web Clips
-- TunNest · WeRead
-- TunNest · Douban
-- TunNest · Weibo
+- 囤囤 · 网页剪藏；
+- 囤囤 · 微信读书；
+- 囤囤 · 豆瓣（这个页面下放置用户、电影 Top 250、图书 Top 250、音乐 Top 250）；
+- 囤囤 · 微博博文。
 
-Use each page's **Connections** menu to share it with the integration created above. An integration cannot create or update databases on a page that has not been shared with it.
+在每个页面右上角打开“连接 / Connections”菜单，把刚创建的 Integration 加入页面。只有授权给 Integration 的页面才能创建或连接数据库。
 
-### 3. Let TunNest create the databases
+### 3. 让扩展自动创建数据库
 
-1. Open the extension settings.
-2. Paste the shared Integration token.
-3. Paste a source's parent-page URL.
-4. Leave **Existing database ID** empty.
-5. Click **Create or connect**.
-6. Repeat for Web Clips, WeRead, and Weibo. In the Douban card, create or connect all four databases under the same parent page.
+1. 打开囤囤扩展设置。
+2. 在“共用 Integration Token”中粘贴 Token。
+3. 在某个来源的“父页面链接”中粘贴对应 Notion 页面链接。
+4. 保持“已有数据库 ID”为空。
+5. 点击“创建或连接”。
+6. 对网页、微信读书和微博分别重复操作；豆瓣卡片需要依次连接四个数据库。
 
-TunNest creates the database and every required property, then stores the returned database ID locally.
+扩展会自动创建数据库和全部必需属性，并把生成的数据库 ID 保存到本机。豆瓣卡片中的四个按钮使用同一个父页面链接，因此四个数据库会并列创建在同一 Notion 页面下。
 
-### 4. Connect existing databases
+### 4. 连接已有数据库
 
-Paste the database ID instead of a parent-page URL and click **Create or connect**. TunNest will:
+如果已经有数据库：
 
-- rename the existing title property to the expected source-specific name;
-- create every missing property;
-- stop with a precise error if an existing property has the correct name but the wrong type.
+1. 把数据库共享给同一个 Integration；
+2. 复制数据库链接或链接中 32 位数据库 ID；
+3. 填入对应来源的“已有数据库 ID”；
+4. 点击“创建或连接”。
+
+扩展会自动把标题列改成该来源要求的名称，并创建缺失属性。如果同名属性存在但类型错误，为避免破坏数据，扩展会停止并列出冲突；请先在 Notion 中重命名或删除冲突属性，再重新连接。
 
 > [!WARNING]
-> `External ID` must be a regular **Rich text** property, not Notion's **Unique ID** property. TunNest uses it as the deduplication and update key.
+> 七个数据库里的“外部 ID”必须是普通“文本 / Rich text”属性，不能使用 Notion 的“唯一 ID / Unique ID”属性。它是 TunNest 更新和去重的关键字段。
 
-`Content Fingerprint` is managed by TunNest. After the first migration sync, unchanged content is skipped. A timestamp change by itself does not cause a rewrite.
+“内容指纹”同样由扩展自动维护，请不要手动编辑。升级后旧记录会在第一次同步时补写一次指纹；之后只有正文、划线、笔记、封面、评分、排名、配图或互动数据等实际内容变化才更新，单纯同步时间变化不会反复改写页面。
 
-### Required database properties
+### 网页剪藏数据库
 
-Property names are shown in English below for explanation. The current extension creates the Chinese names listed in the second column; do not translate them manually unless you also change the source code.
+默认数据库名：`囤囤 · 网页剪藏`
 
-#### Web Clips
-
-| Purpose | Required property name | Notion type |
+| 属性 | Notion 类型 | 用途 |
 |---|---|---|
-| Title | `标题` | Title |
-| Cover | `封面` | Files & media |
-| Type | `类型` | Select |
-| Original page | `原文` | URL |
-| Author | `作者` | Rich text |
-| Summary | `摘要` | Rich text |
-| Tags | `标签` | Multi-select |
-| Saved at | `收藏时间` | Date |
-| Deduplication key | `外部 ID` | Rich text |
-| Change detector | `内容指纹` | Rich text |
+| 标题 | 标题（Title） | 网页或文章标题 |
+| 封面 | 文件与媒体（Files & media） | 网页 OG 图片；同时作为正文媒体导入 |
+| 类型 | 选择（Select） | 网页、文章等 |
+| 原文 | URL | 原始链接 |
+| 作者 | 文本（Rich text） | 页面作者 |
+| 摘要 | 文本（Rich text） | 页面描述或选区摘要 |
+| 标签 | 多选（Multi-select） | 来源与标签 |
+| 收藏时间 | 日期（Date） | 剪藏时间 |
+| 外部 ID | 文本（Rich text） | URL 去重键 |
+| 内容指纹 | 文本（Rich text） | 内容未变化时跳过 Notion 写入 |
 
-Page images, video, and audio are written into the Notion page body, so they do not need additional database properties. TunNest processes up to 24 media items per page: 20 images, four videos, and four audio files. It first asks Notion to import each public HTTPS file. If import fails, it uses an external media block; if that also fails, it leaves a clickable source link. Duplicate media is not imported twice, and failed items are retried when the page is clipped again.
+网页正文中的图片、视频和音频会写入页面内容，不需要额外创建数据库属性。单页最多处理 24 个媒体（图片最多 20 个，视频和音频各最多 4 个）；优先通过 Notion File Upload 远程导入到用户自己的 Notion 空间，失败时改用外链媒体块，再失败则保留可点击的原文件链接。重复媒体不会反复导入，媒体增删会触发更新，失败项在再次剪藏同一网页时会自动重试。
 
-#### WeRead
+### 微信读书数据库
 
-| Purpose | Required property name | Notion type |
+默认数据库名：`囤囤 · 微信读书`
+
+| 属性 | Notion 类型 | 用途 |
 |---|---|---|
-| Book title | `书名` | Title |
-| Cover | `封面` | Files & media |
-| Author | `作者` | Rich text |
-| Source book | `原书链接` | URL |
-| Highlight count | `划线数量` | Number |
-| Sync summary | `同步摘要` | Rich text |
-| Tags | `标签` | Multi-select |
-| Synced at | `同步时间` | Date |
-| Deduplication key | `外部 ID` | Rich text |
-| Change detector | `内容指纹` | Rich text |
+| 书名 | 标题（Title） | 书名 |
+| 封面 | 文件与媒体（Files & media） | 书籍封面 |
+| 作者 | 文本（Rich text） | 作者 |
+| 原书链接 | URL | 微信读书详情页 |
+| 划线数量 | 数字（Number） | 划线与笔记总数 |
+| 同步摘要 | 文本（Rich text） | 本次同步摘要 |
+| 标签 | 多选（Multi-select） | 来源和自定义标签 |
+| 同步时间 | 日期（Date） | 最近同步时间 |
+| 外部 ID | 文本（Rich text） | Book ID 去重键 |
+| 内容指纹 | 文本（Rich text） | 划线、笔记或书籍信息的内容摘要 |
 
-The book image is written to both the `封面` property and the Notion page cover.
+书籍图片会同时写入“封面”属性和 Notion 页面封面。
 
-#### Douban user interests
+### 豆瓣用户数据库
 
-| Purpose | Required property name | Notion type |
+默认数据库名：`囤囤 · 豆瓣用户`
+
+| 属性 | Notion 类型 | 用途 |
 |---|---|---|
-| Name | `名称` | Title |
-| Cover | `封面` | Files & media |
-| Original cover URL | `封面原图` | URL |
-| Media type | `类型` | Select |
-| Source item | `原条目` | URL |
-| Creator | `主创` | Rich text |
-| Interest status | `状态` | Select |
-| Rating | `评分` | Number |
-| Comment | `短评` | Rich text |
-| Tags | `标签` | Multi-select |
-| Saved at | `收藏时间` | Date |
-| Deduplication key | `外部 ID` | Rich text |
-| Change detector | `内容指纹` | Rich text |
+| 名称 | 标题（Title） | 书籍或电影名称 |
+| 封面 | 文件与媒体（Files & media） | 书籍封面或影视海报 |
+| 封面原图 | URL | 豆瓣原始图片直链 |
+| 类型 | 选择（Select） | 书籍、电影 |
+| 原条目 | URL | 豆瓣条目链接 |
+| 主创 | 文本（Rich text） | 作者或导演 |
+| 状态 | 选择（Select） | 想读、在读、读过、想看、在看、看过 |
+| 评分 | 数字（Number） | 用户评分 |
+| 短评 | 文本（Rich text） | 用户短评或简介 |
+| 标签 | 多选（Multi-select） | 用户标签和题材 |
+| 收藏时间 | 日期（Date） | 豆瓣标记时间 |
+| 外部 ID | 文本（Rich text） | Subject ID 去重键 |
+| 内容指纹 | 文本（Rich text） | 收藏内容未变化时跳过写入 |
 
-#### Douban Top 250 databases
+### 豆瓣电影 / 图书 / 音乐 Top 250 数据库
 
-All three Top 250 databases use `名称` as Title and include `封面`, `封面原图`, `排名`, `评分`, `评价人数`, `推荐语`, `原条目`, `标签`, `抓取时间`, `外部 ID`, and `内容指纹`.
+默认数据库名分别为：
 
-They also contain source-specific fields:
+- `囤囤 · 豆瓣电影 Top 250`；
+- `囤囤 · 豆瓣图书 Top 250`；
+- `囤囤 · 豆瓣音乐 Top 250`。
 
-| Database | Additional properties |
-|---|---|
-| Movie Top 250 | `导演`, `主演`, `年份`, `国家/地区`, `类型` |
-| Book Top 250 | `作者`, `译者`, `出版社`, `出版日期`, `定价` |
-| Music Top 250 | `艺术家`, `发行日期`, `版本类型`, `介质`, `流派` |
+三套榜单使用独立的结构化属性，不再把作者、年份等内容混在一个“信息”字段中。三套数据库共有以下属性：
 
-#### Weibo
-
-| Purpose | Required property name | Notion type |
+| 属性 | Notion 类型 | 用途 |
 |---|---|---|
-| Post title | `博文` | Title |
-| First uploaded image | `封面` | Files & media |
-| User | `用户` | Rich text |
-| Original post | `原博文` | URL |
-| Text summary | `正文摘要` | Rich text |
-| Reposts | `转发数` | Number |
-| Comments | `评论数` | Number |
-| Likes | `点赞数` | Number |
-| Tags | `标签` | Multi-select |
-| Published at | `发布时间` | Date |
-| Deduplication key | `外部 ID` | Rich text |
-| Change detector | `内容指纹` | Rich text |
+| 名称 | 标题（Title） | 电影、图书或音乐名称 |
+| 封面 | 文件与媒体（Files & media） | 海报、书封或专辑封面 |
+| 封面原图 | URL | 豆瓣原始图片直链 |
+| 排名 | 数字（Number） | 榜单原始排名；上游条目下架时可能出现跳号 |
+| 评分 | 数字（Number） | 豆瓣当前评分 |
+| 评价人数 | 数字（Number） | 当前评价人数 |
+| 推荐语 | 文本（Rich text） | 榜单推荐语；音乐条目可能为空 |
+| 原条目 | URL | 豆瓣条目链接 |
+| 标签 | 多选（Multi-select） | 豆瓣及榜单类型 |
+| 抓取时间 | 日期（Date） | 本次榜单更新时间 |
+| 外部 ID | 文本（Rich text） | Subject ID 去重键 |
+| 内容指纹 | 文本（Rich text） | 排名、评分或资料变化时才更新 |
 
-Weibo images are downloaded by the extension and uploaded to your Notion file space. The first successful image also becomes the Files property cover. Keep the browser running until the upload finishes.
+电影 Top 250 专属属性：
 
-## Source configuration
+| 属性 | Notion 类型 | 用途 |
+|---|---|---|
+| 导演 | 文本（Rich text） | 导演姓名 |
+| 主演 | 文本（Rich text） | 主要演员 |
+| 年份 | 文本（Rich text） | 上映年份；保留多地区年份 |
+| 国家/地区 | 文本（Rich text） | 制片国家或地区 |
+| 类型 | 多选（Multi-select） | 剧情、犯罪、动画等类型 |
 
-### Web clipping
+图书 Top 250 专属属性：
 
-1. Connect the Web Clips database.
-2. Open the page you want to archive.
-3. Click **Clip current page** in the extension popup.
-4. You may also select text and choose **Save to TunNest** from the context menu.
-5. The default shortcut is `Alt+Shift+S`; on macOS it is `Control+Shift+S`.
+| 属性 | Notion 类型 | 用途 |
+|---|---|---|
+| 作者 | 文本（Rich text） | 作者姓名 |
+| 译者 | 文本（Rich text） | 译者；无译者时为空 |
+| 出版社 | 文本（Rich text） | 出版社 |
+| 出版日期 | 文本（Rich text） | 原榜单中的出版年月或日期 |
+| 定价 | 文本（Rich text） | 原始定价及币种 |
 
-TunNest saves article text, the current selection, metadata, and supported media. It filters obvious icons, avatars, tracking pixels, and duplicates. Interactive applications, paywalls, cross-origin iframes, `blob:`/`data:` URLs, or login-only media may not be fully importable; the source link is retained when possible.
+音乐 Top 250 专属属性：
 
-### WeRead
+| 属性 | Notion 类型 | 用途 |
+|---|---|---|
+| 艺术家 | 文本（Rich text） | 歌手、乐队或原声作者 |
+| 发行日期 | 文本（Rich text） | 专辑发行日期 |
+| 版本类型 | 选择（Select） | 专辑、单曲、EP、Import 等 |
+| 介质 | 选择（Select） | CD、Audio CD、数字介质等 |
+| 流派 | 多选（Multi-select） | 流行、摇滚、民谣等流派 |
 
-Browser sync does not require an API key:
+豆瓣封面不再逐张下载并上传到 Notion。默认模式会把现有 Cloudflare Worker 生成的缓存代理直链写入“封面”，同时把豆瓣原始地址写入“封面原图”。这不使用 D1、R2 或其他对象存储；首次访问由 Worker 转发，后续由边缘缓存直接返回。
 
-1. Open [WeRead Web](https://weread.qq.com/) and sign in.
-2. Keep at least one `weread.qq.com` tab open.
-3. Leave the optional Gateway API key empty.
-4. Click **Sync WeRead**.
+默认选择 `自建镜像优先`。TunNest 先用一个已知电影 ID 做一次健康检查，成功后直接按 `https://dbimg.imnotfound.eu.org/<movie|book|music>/<豆瓣ID>.jpg` 为整批条目生成短直链，不逐张探测或下载；检查失败会自动回退 Cloudflare，不把失效链接写入 Notion。镜像由项目维护者部署，当前通过 Cloudflare 缓存图片。
 
-If you provide a Gateway API key, TunNest uses it instead of the open browser tab. GitHub Actions cannot reuse a browser login, so `WEREAD_API_KEY` is required for unattended WeRead sync.
+### 微博博文数据库
 
-### Douban
+默认数据库名：`囤囤 · 微博博文`
 
-1. Open your Douban profile, for example `https://www.douban.com/people/example/`.
-2. Copy the value after `/people/`, or paste the full profile URL into TunNest.
-3. Under one Douban parent page, create or connect the user, Movie Top 250, Book Top 250, and Music Top 250 databases.
-4. Click **Sync Douban**.
+| 属性 | Notion 类型 | 用途 |
+|---|---|---|
+| 博文 | 标题（Title） | 用户名和正文开头 |
+| 封面 | 文件与媒体（Files & media） | 第一张成功上传的配图 |
+| 用户 | 文本（Rich text） | 微博用户名 |
+| 原博文 | URL | 原博文链接 |
+| 正文摘要 | 文本（Rich text） | 博文正文摘要 |
+| 转发数 | 数字（Number） | 同步时的转发数 |
+| 评论数 | 数字（Number） | 同步时的评论数 |
+| 点赞数 | 数字（Number） | 同步时的点赞数 |
+| 标签 | 多选（Multi-select） | 来源和标签 |
+| 发布时间 | 日期（Date） | 博文发布时间 |
+| 外部 ID | 文本（Rich text） | Post ID 去重键 |
+| 内容指纹 | 文本（Rich text） | 正文、配图或互动数据变化时才更新 |
 
-Public interests usually do not require an Auth token. Private interests may require one. TunNest automatically signs the current Frodo-compatible request; the obsolete `DOUBAN_API_KEY` setting is no longer required.
+微博原图会先由扩展下载，再上传到用户自己的 Notion 文件空间；第一张图片同时写入“封面”属性，全部图片写入页面正文。请在上传过程中保持浏览器运行。
 
-The three public lists are read from:
+## 来源账号配置
 
-- `https://movie.douban.com/top250`
-- `https://book.douban.com/top250`
-- `https://music.douban.com/top250`
+### 网页剪藏
 
-The first full sync creates roughly 750 structured records and can take several minutes because of Notion rate limits.
+1. 先连接“网页剪藏”数据库。
+2. 打开想收藏的页面。
+3. 在扩展弹窗点击“剪藏当前网页”。
+4. 也可以选中文本后右键，选择“保存到囤囤 TunNest”。
+5. 默认快捷键为 `Alt+Shift+S`；macOS 为 `Control+Shift+S`。
 
-#### Cover providers
+剪藏会同时保存正文、选区、正文图片、视频和音频。为避免同步站点图标、头像和追踪像素，明显过小或重复的图片会自动忽略。
 
-The default `mirror-first` mode performs one health check, then builds cached image URLs in this format:
+强交互网页、付费墙、跨域 iframe、`blob:` / `data:` 媒体或只有登录后才能直接访问的媒体可能无法完整导入；失败时 Notion 页面会保留原文件链接。
 
-```text
-https://dbimg.imnotfound.eu.org/<movie|book|music>/<douban-subject-id>.jpg
-```
+### 微信读书
 
-If the mirror is unavailable, TunNest falls back to the configured Cloudflare Douban image proxy. Original URLs remain in `封面原图`.
+浏览器同步不需要 API Key：
 
-#### Optional TMDB movie posters
+1. 打开 [微信读书网页版](https://weread.qq.com/)并完成登录；
+2. 保持至少一个 `weread.qq.com` 标签页处于打开状态；
+3. 扩展设置中的 Gateway API Key 留空；
+4. 点击“同步微信读书”。
 
-TMDB is used only for movies. Available modes are:
+如果填写 Gateway API Key，扩展会优先使用 Gateway，不再依赖打开的网页。Gateway API Key 不是浏览器 Cookie；请只使用你有权获得的 Key，不要把 Cookie 当作 Key 填入。
 
-- `douban`: do not use TMDB;
-- `tmdb-first`: use an exact TMDB title-and-year match first, with Douban as fallback;
-- `tmdb-fallback`: keep Douban when available and use TMDB only as fallback.
+GitHub Actions 无法复用浏览器登录，因此自动同步微信读书时 `WEREAD_API_KEY` 是必填项。如果没有 Gateway API Key，仍可正常使用浏览器手动同步，但不要运行 Actions 的微信读书来源。
 
-Create a TMDB API Read Access Token, paste it into the extension settings, and select a TMDB mode. The token stays in local extension storage and matches are cached for 30 days.
+### 豆瓣
 
-This product uses the TMDB API but is not endorsed or certified by TMDB. Review the current TMDB attribution and commercial-use terms before distributing a paid product.
+1. 打开自己的豆瓣主页，例如 `https://www.douban.com/people/example/`。
+2. 复制 `/people/` 后面的 ID，或直接复制完整主页链接。
+3. 粘贴到扩展设置的“豆瓣用户 ID”。
+4. 在豆瓣数据库卡片中，用同一个父页面依次创建或连接用户、电影 Top 250、图书 Top 250、音乐 Top 250 四个数据库。
+5. 公共收藏无需 API Key，也通常不需要 Auth Token。
+6. 点击“同步豆瓣”。扩展会先读取输入用户的书影收藏，再抓取 `movie.douban.com/top250`、`book.douban.com/top250` 和 `music.douban.com/top250` 的全部分页，分别写入四个数据库。
 
-### Weibo
+首次同步会创建约 750 个榜单页面，受 Notion API 速率限制通常需要数分钟，请保持浏览器运行。封面通过许可证 Worker 的缓存代理直链写入，不再逐张上传，因此不占用 Notion File Upload 时间。豆瓣偶尔会在某一页隐藏已下架条目，因此实际可见数量可能略少于 250；TunNest 会保留源站排名和其中的跳号，不会自行补造条目。
 
-1. Sign in to `weibo.com` in the browser.
-2. Enter one or more numeric user UIDs in TunNest settings, separated by commas.
-3. Select the number of pages to read, from 1 to 10.
-4. Click **Sync Weibo**.
+从 `v1.2.14` 起，TunNest 会自动生成当前 Frodo 接口要求的时间戳与签名。旧版出现 `invalid_request_997` 时，请升级扩展并在 `chrome://extensions` 点击“重新加载”。
 
-TunNest first reuses an open desktop Weibo tab and can fall back to an open mobile Weibo tab. It expands long posts, preserves reposted text, and requests original-resolution images. Cookies remain inside the Weibo page and are never exported to TunNest, Cloudflare, or GitHub Actions.
+豆瓣过去的公开 API 已停止面向新项目申请。当前适配属于实验性兼容层，可能因签名和风控变化失效，不代表豆瓣官方授权。
 
-Status `432`, a verification challenge, “no content,” or “login required” means Weibo has risk-controlled the request. Complete verification in the browser, wait, and retry at a lower frequency.
+#### 可选：使用 TMDB 电影海报
 
-## Subscription and licensing
+TMDB 只用于电影，不替换图书和音乐封面。设置页提供三种模式：
 
-New installations receive a continuous seven-day full-feature trial after the first online validation. Trial expiry prevents new synchronization; it never deletes or locks content already written to Notion.
+- `不使用 TMDB`：默认模式，沿用上方选择的自建镜像或 Cloudflare 豆瓣封面源；
+- `TMDB 优先，豆瓣兜底`：按中文片名和年份精确匹配，匹配成功后使用 `image.tmdb.org` 的 `w500` 海报；
+- `豆瓣优先，TMDB 兜底`：只有豆瓣没有有效封面时才请求 TMDB。
 
-All paid plans include the same features, future maintenance releases, priority support, three browser device slots, and one GitHub Actions repository slot.
+配置方法：
 
-| Plan | Price | Duration |
-|---|---:|---:|
-| Monthly | ¥9.9 | 31 days |
-| Half-year | ¥19.9 | 183 days |
-| Yearly | ¥39.9 | 366 days |
-| Lifetime | ¥299 | No expiry |
+1. 注册并登录 [TMDB](https://www.themoviedb.org/)；
+2. 进入 `Settings → API`，申请个人非商业 API 访问；
+3. 复制 `API Read Access Token`，不要复制 Session ID；
+4. 在扩展设置中选择 TMDB 模式并粘贴 Token；
+5. 保存后重新同步豆瓣。
 
-GitHub Actions is an unattended service and does not participate in the trial. It requires an active paid license.
+Token 只保存在本机 `chrome.storage.local`，不会写进源码、扩展包或 Cloudflare。匹配映射缓存 30 天；标题或年份无法精确匹配时继续使用豆瓣封面，避免错配。TMDB 的开发者 API 仅允许符合其条款的非商业用途；如果未来将此实例对外收费或提供给他人使用，需要先与 TMDB 签订商业协议。
 
-To activate, paste a `tunnest_…` license key into the extension settings and click **Activate online**. If all browser slots are occupied, release the current installation from an old device before activating a new one.
+<img src="extension/assets/tmdb.svg" alt="TMDB" width="120">
 
-### Administrator license management
+This product uses the TMDB API but is not endorsed or certified by TMDB.
 
-The `Issue subscription license` workflow creates customer licenses without exposing the key in logs. Required GitHub values:
+### 微博
 
-- Repository Variable `LICENSE_API_BASE`
-- Repository Secret `LICENSE_ADMIN_TOKEN`
+1. 先在 [微博桌面版](https://weibo.com/)登录。
+2. 打开要同步的用户主页，确认浏览器中可以正常看到博文。
+3. 从主页 URL 找到纯数字 UID，例如 `https://weibo.com/u/6063458646` 中的 `6063458646`。
+4. 在扩展设置中填写 UID；多个 UID 用逗号、中文逗号或空格分隔。
+5. 设置同步页数，范围为 1–10 页。
+6. 保存设置后点击“同步微博”。
 
-The administrator can suspend, restore, extend, clear device bindings, or revoke a license:
+扩展优先复用桌面微博登录态，必要时回退到已打开的移动微博页面。它会读取完整长文、转发内容和原图地址，但不会把 Cookie 上传到 TunNest、Cloudflare 或 GitHub Actions。
+
+微博出现 `432`、验证码、“这里还没有内容”或“需要重新登录”时，请先在微博页面完成验证，确认主页能正常显示，再等待一段时间重试。不要连续高频点击同步。
+
+## 许可证与订阅管理
+
+### 订阅规则
+
+新用户首次在线验证后获得连续 7 天完整试用。试用到期只暂停新的同步，不删除或锁定已经写入 Notion 的页面。
+
+所有付费方案功能一致，包含：
+
+- 全部四类同步；
+- 3 台浏览器设备；
+- 1 个独立 GitHub Actions 仓库槽位；
+- 后续维护更新；
+- 优先客服支持。
+
+GitHub Actions 属于持续无人值守服务，不提供试用，必须使用有效付费许可证。
+
+
+### 激活和释放设备
+
+用户在扩展设置中粘贴 `tunnest_…` 许可证并点击“在线激活”。许可证达到浏览器设备上限时，可在旧设备点击“释放本机付费授权”，然后在新设备重新激活。
+
+管理员也可以调用 API。以下命令中的 `lic_xxx` 是签发日志里的许可证记录 ID：
 
 ```bash
-# Suspend
+# 暂停
 curl -X PATCH "$LICENSE_API_BASE/v1/admin/licenses/lic_xxx" \
   -H "Authorization: Bearer $LICENSE_ADMIN_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"status":"suspended"}'
 
-# Restore
+# 恢复
 curl -X PATCH "$LICENSE_API_BASE/v1/admin/licenses/lic_xxx" \
   -H "Authorization: Bearer $LICENSE_ADMIN_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"status":"active"}'
 
-# Extend by 30 days
+# 延长 30 天
 curl -X PATCH "$LICENSE_API_BASE/v1/admin/licenses/lic_xxx" \
   -H "Authorization: Bearer $LICENSE_ADMIN_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"extendDays":30}'
 
-# Clear browser and Actions bindings
+# 清空所有设备和 Actions 绑定
 curl -X PATCH "$LICENSE_API_BASE/v1/admin/licenses/lic_xxx" \
   -H "Authorization: Bearer $LICENSE_ADMIN_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"clearDevices":true}'
 
-# Permanently revoke
+# 永久撤销
 curl -X PATCH "$LICENSE_API_BASE/v1/admin/licenses/lic_xxx" \
   -H "Authorization: Bearer $LICENSE_ADMIN_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"status":"revoked"}'
 ```
 
-## Cloudflare license service
+## GitHub Actions 每日同步
 
-Cloudflare is used only for dynamic license verification and the Douban image fallback proxy. D1 stores small license records and anonymous installation hashes; it does not store clipped content, platform cookies, Notion tokens, or image files.
+每日工作流只同步适合稳定 GET/POST 的微信读书和豆瓣。微博和网页剪藏不会进入无人值守任务。
 
-### 1. Create D1 and deploy the Worker
+### 1. 准备数据库 ID
 
-```bash
-cd license-worker
-npm install
-npx wrangler login
-npx wrangler d1 create tunnest-license
-```
+先在扩展中连接微信读书和豆瓣数据库。数据库 ID 可以直接从扩展设置复制，也可以从 Notion 数据库链接中提取 32 位 ID。
 
-Copy the returned D1 `database_id` into `license-worker/wrangler.toml`, then run:
+### 2. 配置 Variable
 
-```bash
-npm run db:remote
-npx wrangler secret put ADMIN_TOKEN
-npm run deploy
-```
+在 `Settings → Secrets and variables → Actions → Variables` 添加：
 
-Use a random administrator token of at least 32 bytes. One option is:
-
-```bash
-openssl rand -hex 32
-```
-
-Do not store `ADMIN_TOKEN` in source code. Put the same value in GitHub Secret `LICENSE_ADMIN_TOKEN` only if you use the license-issuance workflow.
-
-### 2. Verify the deployment
-
-The Worker root intentionally returns an “endpoint not found” response. Test the health endpoint instead:
-
-```text
-https://your-license-domain.example/v1/health
-```
-
-A successful deployment returns JSON containing `"ok": true`.
-
-### 3. Configure a custom domain and DNS
-
-If the domain is already managed by Cloudflare:
-
-1. Open **Workers & Pages** in the Cloudflare dashboard.
-2. Select the TunNest license Worker.
-3. Open **Settings → Domains & Routes**.
-4. Choose **Add → Custom Domain**.
-5. Enter a dedicated hostname such as `license.example.com`.
-6. Confirm the automatically created proxied DNS record.
-
-After the certificate becomes active, update all three locations:
-
-- `extension/config.js` → `licenseApiBase`
-- `product.config.json` → `licenseApiBase`
-- GitHub Repository Variable `LICENSE_API_BASE`
-
-Do not include a trailing slash in `LICENSE_API_BASE`.
-
-### 4. Free-tier expectations
-
-The free Workers and D1 quotas are generally enough for an early personal deployment because each validation stores only small rows. Douban images are streamed and cached at the Cloudflare edge; they are not written to D1, R2, or another object store. Monitor actual Workers requests, cache hit rate, and D1 usage as the user base grows, because Cloudflare may change its quotas.
-
-More implementation detail is available in [the license-service deployment guide](docs/license-service.md).
-
-## GitHub Actions daily sync
-
-The scheduled workflow includes only WeRead and Douban, the two sources that are suitable for unattended GET/POST access. Weibo and arbitrary web pages are intentionally excluded.
-
-### 1. Prepare database IDs
-
-Connect the WeRead and all four Douban databases in the extension first. Copy each 32-character database ID from TunNest settings or its Notion URL.
-
-### 2. Add Repository Variables
-
-Go to **Settings → Secrets and variables → Actions → Variables**.
-
-| Variable | Required | Value |
+| 名称 | 必填 | 示例 |
 |---|:---:|---|
-| `LICENSE_API_BASE` | ✅ | Deployed Worker URL, without a trailing slash |
-| `DOUBAN_IMAGE_PROVIDER` | Optional | `mirror-first` or `cloudflare`; default is `mirror-first` |
-| `MOVIE_COVER_PROVIDER` | Optional | `douban`, `tmdb-first`, or `tmdb-fallback` |
+| `LICENSE_API_BASE` | ✅ | `https://license.example.com`，末尾不要加 `/` |
+| `DOUBAN_IMAGE_PROVIDER` | 可选 | `mirror-first` 或 `cloudflare`；默认 `mirror-first` |
+| `MOVIE_COVER_PROVIDER` | 可选 | `douban`、`tmdb-first` 或 `tmdb-fallback`；默认 `douban` |
 
-### 3. Add Repository Secrets
+### 3. 配置 Secrets
 
-Go to **Settings → Secrets and variables → Actions → Secrets**.
+在 `Settings → Secrets and variables → Actions → Secrets` 添加：
 
-| Secret | Used by | Description |
+| Secret | 哪个任务需要 | 说明 |
 |---|---|---|
-| `TUNNEST_LICENSE_KEY` | Both | Active paid TunNest license |
-| `NOTION_TOKEN` | Both | Shared Notion Integration token |
-| `NOTION_WEREAD_DATABASE_ID` | WeRead | WeRead database ID |
-| `WEREAD_API_KEY` | WeRead | WeRead Gateway API key |
-| `NOTION_DOUBAN_DATABASE_ID` | Douban | User-interest database ID |
-| `NOTION_DOUBAN_MOVIE_TOP250_DATABASE_ID` | Douban | Movie Top 250 database ID |
-| `NOTION_DOUBAN_BOOK_TOP250_DATABASE_ID` | Douban | Book Top 250 database ID |
-| `NOTION_DOUBAN_MUSIC_TOP250_DATABASE_ID` | Douban | Music Top 250 database ID |
-| `DOUBAN_USER_ID` | Douban | Value after `/people/` in the profile URL |
-| `DOUBAN_AUTH_TOKEN` | Douban, optional | Needed only for non-public interests |
-| `TMDB_ACCESS_TOKEN` | TMDB modes | TMDB API Read Access Token |
-| `LICENSE_ADMIN_TOKEN` | License issuance only | Not read by the daily sync workflow |
+| `TUNNEST_LICENSE_KEY` | 两者 | 有效付费许可证，不能使用试用 |
+| `NOTION_TOKEN` | 两者 | 共用 Notion Integration Token |
+| `NOTION_WEREAD_DATABASE_ID` | 微信读书 | 微信读书数据库 ID |
+| `WEREAD_API_KEY` | 微信读书 | 微信读书 Gateway API Key |
+| `NOTION_DOUBAN_DATABASE_ID` | 豆瓣 | 用户收藏数据库 ID |
+| `NOTION_DOUBAN_MOVIE_TOP250_DATABASE_ID` | 豆瓣 | 电影 Top 250 数据库 ID |
+| `NOTION_DOUBAN_BOOK_TOP250_DATABASE_ID` | 豆瓣 | 图书 Top 250 数据库 ID |
+| `NOTION_DOUBAN_MUSIC_TOP250_DATABASE_ID` | 豆瓣 | 音乐 Top 250 数据库 ID |
+| `DOUBAN_USER_ID` | 豆瓣 | `/people/` 后面的用户 ID |
+| `DOUBAN_AUTH_TOKEN` | 豆瓣，可选 | 仅非公开收藏需要 |
+| `TMDB_ACCESS_TOKEN` | TMDB 模式 | TMDB API Read Access Token；默认豆瓣模式无需配置 |
+| `LICENSE_ADMIN_TOKEN` | 仅发码 | 管理员密钥；每日同步本身不读取 |
 
-The legacy `NOTION_DATABASE_ID` is only a compatibility fallback and should not be used in a new setup. `DOUBAN_API_KEY` is obsolete and can be removed.
+`DOUBAN_API_KEY` 从 `v1.2.14` 起不再需要，可以删除。Actions 默认使用自建镜像；也可以显式把 Repository Variable `DOUBAN_IMAGE_PROVIDER` 设为 `mirror-first`，健康检查失败时会自动使用 Cloudflare。要使用 TMDB，把 `MOVIE_COVER_PROVIDER` 设为 `tmdb-first` 或 `tmdb-fallback`，再创建同名 Secret `TMDB_ACCESS_TOKEN`。旧版 `lithub-first` 会自动迁移到自建镜像；旧版 `NOTION_DATABASE_ID` 只作为兼容回退，不建议新配置继续使用。
 
-### 4. Test the workflow manually
+### 4. 手动测试工作流
 
-1. Open the repository's **Actions** tab.
-2. Select **TunNest daily content sync**.
-3. Click **Run workflow**.
-4. Choose `weread`, `douban`, or `all`.
-5. Review the two independent job logs.
+1. 打开仓库 `Actions`。
+2. 选择 `TunNest daily content sync`。
+3. 点击 `Run workflow`。
+4. 选择 `weread`、`douban` 或 `all`。
+5. 查看两个独立 Job 的日志。
 
-A WeRead failure does not stop Douban, and a Douban failure does not stop WeRead. License validation happens before platform data is read or Notion is modified.
+微信读书失败不会阻止豆瓣，反之亦然。许可证会在读取平台内容和写入 Notion之前验证；验证失败时不会继续抓取或写入。
 
-### 5. Change the daily schedule
+### 5. 修改每天运行时间
 
-The default schedule is:
+默认配置：
 
 ```yaml
 schedule:
   - cron: "23 18 * * *"
 ```
 
-GitHub cron uses UTC. `18:23 UTC` is approximately `02:23` the next day in China Standard Time. To run around 09:00 China Standard Time, use:
+GitHub Cron 使用 UTC。`18:23 UTC` 对应北京时间次日约 `02:23`，实际启动可能延迟几分钟。比如每天北京时间 09:00 可改为：
 
 ```yaml
 schedule:
   - cron: "0 1 * * *"
 ```
 
-Edit `.github/workflows/daily-sync.yml` and commit the change to the default branch.
+修改文件：`.github/workflows/daily-sync.yml`，提交到默认分支后生效。
 
-Each paid license includes one Actions repository slot identified by `owner/repository`. Moving the license to a different repository requires the administrator to clear old bindings or issue another license.
+### 6. GitHub Action 付费限制
 
-See [the focused GitHub Actions guide](docs/github-actions.md) for a compact checklist.
+每张付费许可证包含 1 个 Actions 仓库槽位，以 `owner/repository` 作为绑定标识，不占用 3 个浏览器槽位。同一许可证放入第二个仓库会被拒绝；需要迁移时，由管理员执行 `{"clearDevices":true}`，再在新仓库运行。
 
-## Publishing a release
+## 发布到 GitHub
 
-Source workflows must be committed under `.github/workflows/*.yml` on the default branch. Uploading only a ZIP to a Release does not install workflows into the repository.
+提交源码：
 
 ```bash
 git add .
 git commit -m "release: TunNest v1.4.4"
 git push origin main
+```
 
+GitHub Actions 工作流必须位于 `.github/workflows/*.yml` 并提交到默认分支。只上传 ZIP 不会让源码工作流自动出现。
+
+创建扩展包：
+
+```bash
 npm ci
 npm test
 npm run check
 npm run package
-
-gh release create v1.4.4 dist/tunnest-extension.zip \
-  --title "TunNest v1.4.4" \
-  --notes "TunNest v1.4.4"
 ```
 
-Keep both the source repository and the Release archive: the repository provides reviewable code, issues, and Actions; the archive is convenient for browser installation. Secrets and Notion tokens are never included in the ZIP.
+使用 GitHub CLI 创建 Release：
 
-## Troubleshooting
+```bash
+gh release create v1.4.4 dist/tunnest-extension.zip \
+  --title "TunNest v1.4.4" \
+  --notes "囤囤 TunNest v1.4.4"
+```
+
+推荐同时保留完整源码仓库和 Release ZIP：源码便于审计、Issue 与 Actions，Release 便于普通用户安装。Cloudflare Secret、GitHub Secret 和 Notion Token 都不会被打进 ZIP，仍需要按本文单独配置。
+
+## 常见问题与排错
 
 <details>
-<summary><strong>The license domain returns “endpoint not found”</strong></summary>
+<summary><strong>打开许可证域名显示“接口不存在”</strong></summary>
 
-This is expected at `/`. Open `/v1/health`; `{"ok":true,...}` confirms that the Worker is running.
+根路径没有页面，这是正常行为。访问 `https://你的域名/v1/health`；返回 `{"ok":true,...}` 才表示 Worker 正常。
 </details>
 
 <details>
-<summary><strong>The license workflow reports a missing LICENSE_ADMIN_TOKEN</strong></summary>
+<summary><strong>Actions 报错“缺少 LICENSE_ADMIN_TOKEN”</strong></summary>
 
-Create a Repository **Secret** named exactly `LICENSE_ADMIN_TOKEN`. Do not create it as a Variable, wrap the value in quotes, or paste a Markdown-formatted link.
+进入仓库 `Settings → Secrets and variables → Actions → Secrets`，创建名称完全一致的 `LICENSE_ADMIN_TOKEN`。不要创建成 Variable，不要在值外加引号，也不要把 `[https://…](https://…)` 这种 Markdown 链接粘进去。
 </details>
 
 <details>
-<summary><strong>The Worker reports “administrator authentication failed”</strong></summary>
+<summary><strong>Actions 报错“管理员认证失败”</strong></summary>
 
-GitHub Secret `LICENSE_ADMIN_TOKEN` and Worker Secret `ADMIN_TOKEN` do not match. Run `npx wrangler secret put ADMIN_TOKEN` again and save the same raw value in GitHub.
+GitHub Secret 与 Cloudflare Worker 中的 `ADMIN_TOKEN` 不一致。重新运行 `npx wrangler secret put ADMIN_TOKEN`，然后把同一个值重新保存到 GitHub `LICENSE_ADMIN_TOKEN`。确认 `LICENSE_API_BASE` 指向刚更新的 Worker。
 </details>
 
 <details>
-<summary><strong>Chrome reports “Manifest is not valid JSON”</strong></summary>
+<summary><strong>扩展提示 Manifest is not valid JSON</strong></summary>
 
-Run `npm run check` from the repository root, fix the reported JSON syntax, and rebuild with `npm run package`. Do not edit files inside the ZIP directly.
+通常是编辑 `manifest.json` 时漏了逗号或多了尾逗号。回到项目根目录运行 `npm run check`，按提示修复后重新执行 `npm run package`，不要直接修改 ZIP 内文件。
 </details>
 
 <details>
-<summary><strong>Notion cannot find the `外部 ID` property</strong></summary>
+<summary><strong>Notion 提示找不到“外部 ID”</strong></summary>
 
-Open TunNest settings and reconnect the corresponding database. The current extension creates missing properties automatically. If a property with that name already exists with the wrong type, rename or remove it first. The required type is Rich text, not Unique ID.
+打开扩展设置，对对应数据库重新点击“创建或连接”。最新版会自动创建缺失属性。如果已经有同名但类型错误的属性，请先重命名或删除它；正确类型是“文本 / Rich text”，不是“唯一 ID”。
 </details>
 
 <details>
-<summary><strong>Notion returns `body failed validation`</strong></summary>
+<summary><strong>Notion 返回 body failed validation</strong></summary>
 
-Confirm that the database is connected to the correct source and that same-name properties use the types listed above. Reconnect to migrate the schema, then confirm that the integration can read, insert, and update content.
+优先检查数据库是否连接到了正确来源，以及同名属性类型是否与本文属性表一致。重新执行“创建或连接”让扩展补齐 schema；仍失败时保留完整错误文本，并确认 Integration 拥有读取、插入和更新内容权限。
 </details>
 
 <details>
-<summary><strong>Douban returns `invalid_request_997`</strong></summary>
+<summary><strong>豆瓣出现 invalid_request_997</strong></summary>
 
-Upgrade to the latest version and reload the extension. Current releases generate the required request signature automatically; do not configure the obsolete `DOUBAN_API_KEY`.
+升级到 `v1.2.14` 或更高版本，在 `chrome://extensions` 点击“重新加载”。新版自动签名，不要再填写或配置 `DOUBAN_API_KEY`。
 </details>
 
 <details>
-<summary><strong>Weibo returns 432, empty content, or login required</strong></summary>
+<summary><strong>微博返回 432、异常、空内容或需要重新登录</strong></summary>
 
-Open the target profile on `weibo.com`, complete any verification, and confirm that posts are visible. Wait before retrying and avoid frequent repeated syncs. Cloudflare and GitHub Actions cannot bypass Weibo risk controls.
+在 `weibo.com` 打开目标用户主页，完成登录或验证码并确认页面能看到博文。等待一段时间后重试，避免短时间内连续同步。微博风控状态无法通过 GitHub Actions 或 Cloudflare 绕过。
 </details>
 
 <details>
-<summary><strong>Weibo images appear only as links or fail to upload</strong></summary>
+<summary><strong>微博图片只有链接或上传失败</strong></summary>
 
-Keep the browser open until download, upload, and block creation are complete. Confirm that the Notion integration can update content. An expired source URL, interrupted network, or a file over Notion's limit causes TunNest to retain a clickable original link.
+升级并重新加载扩展，保持浏览器运行直至配图下载、上传和插入完成。确认 Notion Integration 有更新内容权限。单图超过 Notion 文件限制、微博源图失效或网络中断时，扩展会保留可点击原图链接，避免内容完全丢失。
 </details>
 
 <details>
-<summary><strong>The sync button needs a second click or progress disappears</strong></summary>
+<summary><strong>点击同步后没有反应，或者关闭弹窗后看不到进度</strong></summary>
 
-Upgrade and reload the extension. Current versions bind actions before initialization and store sync progress in extension local storage. Reopening the popup restores the running state. Do not close the entire browser during a long job.
+升级并重新加载扩展。同步进度保存在扩展本地存储，重新打开弹窗会恢复显示；长任务期间不要关闭整个浏览器。若上次同步异常中断，等待状态恢复后重新运行或点击停止。
 </details>
 
 <details>
-<summary><strong>No workflow appears in the repository</strong></summary>
+<summary><strong>仓库里看不到 Workflow</strong></summary>
 
-Confirm that `.github/workflows/ci.yml`, `daily-sync.yml`, and `issue-license.yml` are committed to the default branch and Actions are enabled under repository settings. A Release ZIP alone does not add source workflows.
+确认 `.github/workflows/ci.yml`、`daily-sync.yml` 和 `issue-license.yml` 已提交到默认分支，并在仓库 `Settings → Actions → General` 允许 Actions。只把扩展 ZIP 上传到 Release 不会添加源码工作流。
 </details>
 
-## Privacy and security boundaries
+<details>
+<summary><strong>Cloudflare 免费额度够用吗</strong></summary>
+
+对早期个人项目通常足够。Worker 处理轻量授权请求和豆瓣封面代理，封面响应会在 Cloudflare 边缘缓存 30 天；D1 仍只保存小型授权记录，不保存图片。实际额度以 Cloudflare 当前免费套餐为准，用户量增长后应查看 Workers 请求量、缓存命中率和 D1 用量面板。
+</details>
+
+## 隐私与安全边界
 
 ```mermaid
 flowchart LR
-  A["WeRead / Douban / Weibo / Web"] --> B["Browser extension"]
-  C["WeRead / Douban"] --> D["GitHub Actions"]
-  B --> E["Your Notion workspace"]
+  A["微信读书 / 豆瓣 / 微博 / 网页"] --> B["浏览器扩展"]
+  C["微信读书 / 豆瓣"] --> D["GitHub Actions"]
+  B --> E["用户自己的 Notion"]
   D --> E
-  B -. "License status / Douban cover URL" .-> F["Cloudflare Worker + D1"]
-  D -. "License status / Douban cover URL" .-> F
+  B -. "授权状态 / 豆瓣封面 URL" .-> F["Cloudflare Worker + D1"]
+  D -. "授权状态 / 豆瓣封面 URL" .-> F
 ```
 
-- Content goes directly from the extension or Actions to the user's Notion workspace.
-- The Cloudflare Worker does not receive clipped text, platform cookies, or Notion tokens.
-- Notion tokens live only in `chrome.storage.local` or GitHub Secrets.
-- D1 stores license hashes, anonymous installation hashes, plan state, expiry, and device slots.
-- Douban images are streamed and edge-cached; they are not stored in D1, R2, or another persistent object store.
-- No license public key or permanent offline entitlement is embedded in the extension.
-- Entitlement refreshes online every six hours, with a limited offline grace period.
-- Weibo cookies remain in Weibo's own browser context.
-- The bundled Noto Sans SC subset is used under the SIL Open Font License; see `brand/fonts/`.
+- 收藏内容由扩展或 Actions 直接写入用户自己的 Notion；
+- Cloudflare Worker 不接收收藏正文、平台 Cookie 或 Notion Token；它只代理公开的豆瓣封面 URL；
+- Notion Token 只保存在本机 `chrome.storage.local` 或 GitHub Secrets；
+- D1 只保存许可证哈希、匿名安装码哈希、套餐、到期状态和设备槽位；
+- 豆瓣图片使用流式代理和 30 天边缘缓存，不写入 D1、R2 或其他持久存储；
+- 扩展不内置许可证公钥，不在本地离线判定永久授权；
+- 授权每 6 小时在线刷新一次，临时断网最多宽限 24 小时；
+- 微博 Cookie 只由微博页面自身使用，不导出到 TunNest；
+- 项目字体为 Noto Sans SC，依据 SIL Open Font License 使用，许可见 `brand/fonts/`。
 
-See [Architecture](docs/architecture.md) and [Security Policy](SECURITY.md) for additional detail.
+更详细的边界见 [架构说明](docs/architecture.md) 和 [安全策略](SECURITY.md)。
 
-## Project structure and development
+## 项目结构与开发命令
 
 ```text
 TunNest/
-├── extension/          # Chrome Manifest V3 extension
-├── automation/         # WeRead and Douban → Notion scripts
-├── license-worker/     # Cloudflare Worker + D1 licensing
-├── .github/workflows/  # CI, daily sync, and license issuance
-├── brand/              # Icons, banners, diagrams, and font license
-├── docs/               # Architecture, policy, and setup notes
-├── test/               # Configuration, source, Notion, and license tests
-└── tools/              # Administrator license utility
+├── extension/          # Chrome Manifest V3 扩展
+├── automation/         # 微信读书、豆瓣 → Notion 同步脚本
+├── license-worker/     # Cloudflare Worker + D1 动态授权
+├── .github/workflows/  # CI、每日同步和许可证签发
+├── brand/              # 图标、Banner、流程图和字体许可
+├── docs/               # 架构、策略与验证补充文档
+├── test/               # 配置、转换、Notion 与订阅测试
+└── tools/              # 管理员许可证工具
 ```
 
 ```bash
-npm test          # Run the test suite
-npm run check     # Validate JSON, YAML, JavaScript, and extension assets
-npm run package   # Build the unpacked extension and ZIP
-npm run sync      # Run an environment-configured sync locally
+npm test          # 运行测试
+npm run check     # 检查 JSON、YAML、JS 和扩展资源
+npm run package   # 生成扩展目录和 ZIP
+npm run sync      # 使用环境变量在本地运行自动同步
 
 cd license-worker
-npm run check     # Type-check the Worker
-npm run db:remote # Apply remote D1 migrations
-npm run deploy    # Deploy the Worker
+npm run check     # 检查 Worker TypeScript
+npm run db:remote # 应用远程 D1 migrations
+npm run deploy    # 部署 Worker
 ```
 
-## Current limitations
+## 当前能力边界
 
-- Douban user interests use an unofficial Frodo-compatible interface, while the Top 250 lists are parsed from public pages. Either path may change.
-- Weibo supports active browser sync only; it is not included in Actions.
-- Web clipping quality depends on page structure, login state, embedded frames, and paywalls.
-- WeRead Actions require a Gateway API key; browser login cannot replace it in GitHub runners.
-- The extension has not completed official Chrome Web Store review.
-- Publishers must connect payment completion to license delivery themselves; the repository currently includes a manual Actions-based issuance flow.
-- Saving content to Notion does not change its copyright or the user's obligations to source platforms and authors.
+- 豆瓣用户收藏使用非公开 Frodo 兼容接口，三套 Top 250 读取公开网页；签名、页面结构和风控均可能变化；
+- 微博只支持浏览器主动同步，不提供 Actions 自动抓取；
+- 网页剪藏效果取决于页面结构、登录态和付费墙；
+- 微信读书 Actions 必须有 Gateway API Key，浏览器登录不能直接替代；
+- 当前扩展尚未完成 Chrome Web Store 正式审核；
+- 发布者需要自行接入支付完成后的自动发码，当前提供人工 Actions 发码流程；
+- 保存到 Notion 不改变源内容版权，使用者仍需遵守平台规则和原作者授权范围。
 
-## Inspiration and ecosystem references
+## 灵感与生态参考
 
-TunNest's initial research reviewed the product boundaries and synchronization patterns of:
+研究阶段参考了以下开源项目的产品边界与同步思路：
 
 - [malinkang/weread2notion](https://github.com/malinkang/weread2notion)
 - [malinkang/weread2notion-pro](https://github.com/malinkang/weread2notion-pro)
@@ -666,18 +654,18 @@ TunNest's initial research reviewed the product boundaries and synchronization p
 - [malinkang/keep2notion](https://github.com/malinkang/keep2notion)
 - [malinkang/notionhub-integration](https://github.com/malinkang/notionhub-integration)
 
-Reference does not imply affiliation, partnership, or endorsement. Respect each upstream project's license and attribution requirements.
+参考不代表从属、合作或官方授权。请尊重各项目的许可证和署名要求。
 
-## Contributing and license
+## 贡献与许可
 
-Bug reports, compatibility fixes, documentation improvements, and reproducible tests are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request. Never publish cookies, API tokens, Notion tokens, or license keys in an issue.
+欢迎提交 Bug、接口兼容修复、文档改进和可复现测试。开始前请阅读 [CONTRIBUTING.md](CONTRIBUTING.md)。涉及上游平台时，不要在 Issue 中公开 Cookie、Token、许可证或其他私密凭据。
 
-TunNest source code is available under the [MIT License](LICENSE). Platform content, third-party APIs, trademarks, and user data keep their original ownership and terms.
+项目代码采用 [MIT License](LICENSE)。平台内容、第三方接口、品牌名称和用户保存的数据不因本项目许可证而改变其权利归属。
 
 ---
 
 <div align="center">
-  <img src="brand/tunnest-icon.svg" width="52" height="52" alt="TunNest">
-  <p><strong>Saving is not hoarding. It is giving something you love a place where you can find it again.</strong></p>
-  <p><a href="https://github.com/zengyincen/TunNest/releases/latest">Download the latest release</a> · <a href="#quick-start">Build your private archive</a></p>
+  <img src="brand/tunnest-icon.svg" width="52" height="52" alt="囤囤 TunNest">
+  <p><strong>收藏不是囤积，是给喜欢的东西一个以后还能找到的位置。</strong></p>
+  <p><a href="https://github.com/zengyincen/TunNest/releases">下载最新版本</a> · <a href="#快速开始">开始搭建数字巢穴</a></p>
 </div>
