@@ -1,6 +1,6 @@
 {
   "name": "tunnest",
-  "version": "1.3.1",
+  "version": "1.3.2",
   "private": true,
   "type": "module",
   "description": "囤囤（TunNest）：微信读书、豆瓣、微博与网页到 Notion 的浏览器扩展和每日同步 Actions",

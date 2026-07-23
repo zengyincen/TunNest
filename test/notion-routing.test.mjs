@@ -146,6 +146,55 @@ test("does not upload an already Notion-hosted Douban cover again",async()=>{
   }finally{globalThis.fetch=previousFetch;}
 });
 
+test("batch-checks existing records and skips unchanged Top 250 writes",async()=>{
+  const previousFetch=globalThis.fetch,calls=[],databaseId="7".repeat(32);
+  const items=Array.from({length:5},(_,index)=>({
+    kind:"music",externalId:`music-${index + 1}`,title:`唱片 ${index + 1}`,
+    url:`https://music.douban.com/subject/${index + 1}/`,coverUrl:`https://img1.doubanio.com/view/photo/s_ratio_poster/public/p${index + 1}.jpg`,
+    tags:["豆瓣","音乐 Top 250"],capturedAt:"2026-07-23T00:00:00Z",
+    metadata:{rank:index + 1,rating:9.1,ratingCount:1000 + index,info:`歌手 ${index + 1}`,quote:"推荐语"}
+  }));
+  const pages=items.map((item)=>({id:`page-${item.externalId}`,properties:{
+    "名称":{title:[{plain_text:item.title}]},"封面":{files:[{type:"file",file:{url:"https://notion.example/cover.jpg"}}]},
+    "排名":{number:item.metadata.rank},"评分":{number:item.metadata.rating},"评价人数":{number:item.metadata.ratingCount},
+    "信息":{rich_text:[{plain_text:item.metadata.info}]},"推荐语":{rich_text:[{plain_text:item.metadata.quote}]},
+    "原条目":{url:item.url},"标签":{multi_select:item.tags.map((name)=>({name}))},"外部 ID":{rich_text:[{plain_text:item.externalId}]}
+  }}));
+  globalThis.fetch=async(url,init={})=>{
+    calls.push({url:String(url),init});
+    const value=String(url);
+    const data=value.endsWith("/query")?{results:pages,has_more:false}:value.includes("/databases/")&&init.method!=="PATCH"?databaseData("doubanMusicTop250",databaseId):{};
+    return{ok:true,status:200,json:async()=>data};
+  };
+  try{
+    const result=await syncItems("token",databaseId,items,"doubanMusicTop250");
+    assert.equal(result.every((item)=>item.ok),true);
+    const queries=calls.filter((call)=>call.url.endsWith("/query"));
+    assert.equal(queries.length,1);
+    assert.equal(JSON.parse(queries[0].init.body).filter.or.length,5);
+    assert.equal(calls.some((call)=>/\/pages(?:\/|$)/.test(new URL(call.url).pathname)),false);
+    assert.equal(calls.some((call)=>call.url.includes("/file_uploads")),false);
+  }finally{globalThis.fetch=previousFetch;}
+});
+
+test("uses batch duplicate checks for multi-item WeRead synchronization",async()=>{
+  const previousFetch=globalThis.fetch,calls=[],databaseId="8".repeat(32);
+  globalThis.fetch=async(url,init={})=>{
+    calls.push({url:String(url),init});
+    const value=String(url),data=value.endsWith("/query")?{results:[],has_more:false}:value.includes("/databases/")&&init.method!=="PATCH"?databaseData("weread",databaseId):value.endsWith("/pages")?{id:`book-${calls.length}`} : {};
+    return{ok:true,status:200,json:async()=>data};
+  };
+  try{
+    const items=Array.from({length:5},(_,index)=>({kind:"book",externalId:`book-${index}`,title:`书籍 ${index}`,url:`https://weread.qq.com/web/bookDetail/${index}`,highlights:[],tags:["微信读书"],capturedAt:"2026-07-23T00:00:00Z"}));
+    const result=await syncItems("token",databaseId,items,"weread");
+    assert.equal(result.every((item)=>item.ok),true);
+    const queries=calls.filter((call)=>call.url.endsWith("/query"));
+    assert.equal(queries.length,1);
+    assert.equal(JSON.parse(queries[0].init.body).filter.or.length,5);
+    assert.equal(calls.filter((call)=>call.url.endsWith("/pages")).length,5);
+  }finally{globalThis.fetch=previousFetch;}
+});
+
 test("adds the shared image property to an existing database",async()=>{
   const previousFetch=globalThis.fetch,calls=[];
   const properties=Object.fromEntries(Object.entries(NOTION_DATABASE_SCHEMAS.weread.properties).filter(([name])=>name!=="封面").map(([name,definition])=>[name,{type:Object.keys(definition)[0]}]));

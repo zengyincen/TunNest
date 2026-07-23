@@ -6,7 +6,7 @@
 
   <p>
     <a href="https://github.com/zengyincen/TunNest/actions/workflows/ci.yml"><img src="https://github.com/zengyincen/TunNest/actions/workflows/ci.yml/badge.svg" alt="TunNest CI"></a>
-    <img src="https://img.shields.io/badge/release-v1.3.1-1D1D1F?style=flat-square" alt="Release v1.3.1">
+    <img src="https://img.shields.io/badge/release-v1.3.2-1D1D1F?style=flat-square" alt="Release v1.3.2">
     <img src="https://img.shields.io/badge/Chrome-Manifest_V3-4285F4?style=flat-square&logo=googlechrome&logoColor=white" alt="Chrome Manifest V3">
     <img src="https://img.shields.io/badge/同步来源-4-30D158?style=flat-square" alt="4 个同步来源">
     <img src="https://img.shields.io/badge/完整试用-7_天-FF9F0A?style=flat-square" alt="7 天完整试用">
@@ -413,7 +413,7 @@ schedule:
 
 ```bash
 git add .
-git commit -m "release: TunNest v1.3.1"
+git commit -m "release: TunNest v1.3.2"
 git push origin main
 ```
 
@@ -431,9 +431,9 @@ npm run package
 使用 GitHub CLI 创建 Release：
 
 ```bash
-gh release create v1.3.1 dist/tunnest-extension.zip \
-  --title "TunNest v1.3.1" \
-  --notes "囤囤 TunNest v1.3.1"
+gh release create v1.3.2 dist/tunnest-extension.zip \
+  --title "TunNest v1.3.2" \
+  --notes "囤囤 TunNest v1.3.2"
 ```
 
 推荐同时保留完整源码仓库和 Release ZIP：源码便于审计、Issue 与 Actions，Release 便于普通用户安装。Cloudflare Secret、GitHub Secret 和 Notion Token 都不会被打进 ZIP，仍需要按本文单独配置。

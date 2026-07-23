@@ -3,7 +3,9 @@ const FILE_VERSION = "2026-03-11";
 const MANAGED_IMAGE_CAPTION = "TunNest · ";
 const MANAGED_BLOCK_MARKER = "\u2063\u200b\u2063";
 let nextRequestAt = 0;
+let notionRequestTail = Promise.resolve();
 const ensuredDatabaseSchemas = new Map();
+const NOTION_QUERY_BATCH_SIZE = 50;
 
 export const NOTION_DATABASE_SCHEMAS = {
   clip: {
@@ -84,30 +86,46 @@ export async function syncItems(token, databaseId, items, source, onProgress = (
   sourceSchema(source);
   const normalizedDatabaseId = notionId(databaseId);
   await ensureDatabaseSchema(token, normalizedDatabaseId, source, options.signal);
-  const results = [];
-  for (const [index, item] of items.entries()) {
-    throwIfAborted(options.signal);
-    await onProgress(index, items.length, `${index + 1}/${items.length} · 正在写入「${String(item.title || "未命名内容").slice(0, 28)}」`);
-    try {
-      const context = {
-        signal: options.signal,
-        onDetail: (detail) => onProgress(index, items.length, `${index + 1}/${items.length} · ${detail}`)
-      };
-      results.push({ ok: true, id: await upsertItem(token, normalizedDatabaseId, item, source, context) });
-    } catch (error) {
-      if (options.signal?.aborted) throw error;
-      results.push({ ok: false, error: error.message, title: item.title });
+  const existingPages = await preloadExistingPages(token, normalizedDatabaseId, items, options.signal, onProgress);
+  const results = new Array(items.length);
+  const concurrency = items.length > 1 ? (isDoubanSource(source) ? 3 : 2) : 1;
+  let nextIndex = 0, completed = 0;
+  async function worker() {
+    while (nextIndex < items.length) {
+      const index = nextIndex++, item = items[index];
+      throwIfAborted(options.signal);
+      await onProgress(completed, items.length, `${index + 1}/${items.length} · 正在写入「${String(item.title || "未命名内容").slice(0, 28)}」`);
+      try {
+        const context = {
+          signal: options.signal,
+          existingPages,
+          onDetail: (detail) => onProgress(completed, items.length, `${index + 1}/${items.length} · ${detail}`)
+        };
+        results[index] = { ok: true, id: await upsertItem(token, normalizedDatabaseId, item, source, context) };
+      } catch (error) {
+        if (options.signal?.aborted) throw error;
+        results[index] = { ok: false, error: error.message, title: item.title };
+      }
+      completed++;
+      await onProgress(completed, items.length, completed < items.length ? `已处理 ${completed}/${items.length} 条` : "正在完成同步");
     }
-    await onProgress(index + 1, items.length, index + 1 < items.length ? `已写入 ${index + 1}/${items.length} 条` : "正在完成同步");
   }
+  await Promise.all(Array.from({ length: Math.min(concurrency, items.length) }, worker));
   return results;
 }
 
 async function upsertItem(token, databaseId, item, source, context = {}) {
-  const { signal, onDetail = () => {} } = context;
+  const { signal, onDetail = () => {}, existingPages = null } = context;
   const externalId = String(item.externalId || item.url || item.title).slice(0, 1900);
-  const query = await notion(token, `/databases/${databaseId}/query`, withSignal({ method: "POST", body: JSON.stringify({ filter: { property: "外部 ID", rich_text: { equals: externalId } }, page_size: 1 }) }, signal));
-  const existingPage = query.results?.[0];
+  let existingPage = existingPages?.get(externalId);
+  if (!existingPages) {
+    const query = await notion(token, `/databases/${databaseId}/query`, withSignal({ method: "POST", body: JSON.stringify({ filter: { property: "外部 ID", rich_text: { equals: externalId } }, page_size: 1 }) }, signal));
+    existingPage = query.results?.[0];
+  }
+  if (existingPage && isTop250Source(source) && hasNotionHostedCover(existingPage) && top250Unchanged(existingPage, item, externalId)) {
+    await onDetail("内容未变化，已跳过写入");
+    return existingPage.id;
+  }
   const properties = propertiesFor(item, externalId, source);
   let cover = pageCover(item), version = VERSION;
   if (isDoubanSource(source) && isDoubanImageUrl(representativeImageUrl(item))) {
@@ -223,12 +241,11 @@ async function syncUploadedImages(token, pageId, item, context = {}) {
     url: typeof image === "string" ? image : image?.url,
     caption: typeof image === "string" ? `配图 ${index + 1}` : image.caption || `配图 ${index + 1}`
   })).filter((image) => /^https:\/\//i.test(image.url || ""));
+  if (!images.length) return;
   const children = await notion(token, `/blocks/${pageId}/children?page_size=100`, withSignal({}, signal));
   const managedImages = (children.results || []).filter((block) => block.type === "image" && captionText(block.image?.caption).startsWith(MANAGED_IMAGE_CAPTION));
   const managedFallbacks = (children.results || []).filter((block) => block.type === "paragraph" && captionText(block.paragraph?.rich_text).startsWith(`${MANAGED_IMAGE_CAPTION}配图上传失败`));
   if (managedImages.length === images.length && images.length && !managedFallbacks.length) return;
-  if (!images.length) return;
-
   const blocks = [], errors = [];
   let firstUploadedFile = null;
   for (const [index, image] of images.entries()) {
@@ -322,8 +339,8 @@ async function uploadImage(token, url, index, signal, onDetail = () => {}, sourc
   throw new Error(`${downloadFailure || `${label}下载失败`}；Notion 远程导入失败（${importFailure || "未知原因"}）`);
 }
 
-async function notion(token, path, init = {}, version = VERSION) {
-  const delay = Math.max(0, nextRequestAt - Date.now()); if (delay) await new Promise((resolve) => setTimeout(resolve, delay)); nextRequestAt = Date.now() + 350;
+async function notion(token, path, init = {}, version = VERSION, attempt = 0) {
+  await reserveNotionRequest(init.signal);
   const formData = typeof FormData !== "undefined" && init.body instanceof FormData;
   const { response, body: data } = await timedFetch(
     `https://api.notion.com/v1${path}`,
@@ -332,6 +349,11 @@ async function notion(token, path, init = {}, version = VERSION) {
     formData ? "Notion 文件上传" : "Notion 请求",
     (value) => value.json().catch(() => ({}))
   );
+  if (response.status === 429 && attempt < 3) {
+    const retryAfter = Math.max(1, Number(response.headers?.get?.("Retry-After")) || 1);
+    await pause(retryAfter * 1000, init.signal);
+    return notion(token, path, init, version, attempt + 1);
+  }
   if (!response.ok) throw new Error(data.message || `Notion 请求失败 (${response.status})`); return data;
 }
 function sourceSchema(source) { const schema = NOTION_DATABASE_SCHEMAS[source]; if (!schema) throw new Error("未知 Notion 数据库类型"); return schema; }
@@ -356,6 +378,22 @@ function isDoubanImageUrl(value) { try { return /(^|\.)doubanio\.com$/i.test(new
 function hasNotionHostedCover(page) { return (page?.properties?.["封面"]?.files || []).some((file) => file.type === "file" || file.type === "file_upload"); }
 function uploadedPageCover(id) { return { type: "file_upload", file_upload: { id } }; }
 function uploadedImageFiles(id) { return { files: [{ name: "封面", type: "file_upload", file_upload: { id } }] }; }
+function top250Unchanged(page, item, externalId) {
+  const properties = page?.properties || {}, metadata = item.metadata || {};
+  return propertyText(properties["名称"]) === String(item.title || "").slice(0, 1900)
+    && propertyNumber(properties["排名"]) === nullableNumber(metadata.rank)
+    && propertyNumber(properties["评分"]) === nullableNumber(metadata.rating)
+    && propertyNumber(properties["评价人数"]) === nullableNumber(metadata.ratingCount)
+    && propertyText(properties["信息"]) === String(metadata.info || item.author || "").slice(0, 1900)
+    && propertyText(properties["推荐语"]) === String(metadata.quote || "").slice(0, 1900)
+    && (properties["原条目"]?.url || "") === String(item.url || "")
+    && propertyText(properties["外部 ID"]) === externalId
+    && sameStrings((properties["标签"]?.multi_select || []).map((tag) => tag.name), (item.tags || []).slice(0, 20).map((tag) => String(tag).slice(0, 100)));
+}
+function propertyText(property) { return (property?.title || property?.rich_text || []).map((part) => part.plain_text ?? part.text?.content ?? "").join(""); }
+function propertyNumber(property) { return property?.number === null || property?.number === undefined ? null : Number(property.number); }
+function nullableNumber(value) { const parsed = Number(value); return value === null || value === undefined || value === "" || !Number.isFinite(parsed) ? null : parsed; }
+function sameStrings(left, right) { const a = [...left].sort(), b = [...right].sort(); return a.length === b.length && a.every((value, index) => value === b[index]); }
 function normalizeImageUrl(value) { const normalized=String(value||"").trim().replace(/^http:/i,"https:").replace(/^\/\//,"https://");if(!normalized)return "";try{const url=new URL(normalized);return url.protocol==="https:"&&url.href.length<=2000?url.href:"";}catch{return "";} }
 function pageCover(item) { const url=representativeImageUrl(item);return url?{type:"external",external:{url}}:null; }
 function imageFiles(item) { const url=representativeImageUrl(item);return{files:url?[{name:"封面",type:"external",external:{url}}]:[]}; }
@@ -391,6 +429,49 @@ function ensureDatabaseSchema(token, databaseId, source, signal) {
 }
 function withSignal(init, signal) { return signal ? { ...init, signal } : init; }
 function throwIfAborted(signal) { if (signal?.aborted) throw new Error("同步已停止"); }
+async function reserveNotionRequest(signal) {
+  const previous = notionRequestTail;
+  let release;
+  notionRequestTail = new Promise((resolve) => { release = resolve; });
+  await previous;
+  try {
+    const delay = Math.max(0, nextRequestAt - Date.now());
+    if (delay) await pause(delay, signal);
+    nextRequestAt = Date.now() + 350;
+  } finally { release(); }
+}
+async function preloadExistingPages(token, databaseId, items, signal, onProgress) {
+  if (items.length < 5) return null;
+  const ids = [...new Set(items.map((item) => String(item.externalId || item.url || item.title).slice(0, 1900)))];
+  const pages = new Map();
+  try {
+    await onProgress(0, items.length, `正在批量比对 ${items.length} 条已有记录`);
+    for (let offset = 0; offset < ids.length; offset += NOTION_QUERY_BATCH_SIZE) {
+      const chunk = ids.slice(offset, offset + NOTION_QUERY_BATCH_SIZE);
+      let cursor;
+      do {
+        const response = await notion(token, `/databases/${databaseId}/query`, withSignal({
+          method: "POST",
+          body: JSON.stringify({
+            filter: { or: chunk.map((id) => ({ property: "外部 ID", rich_text: { equals: id } })) },
+            page_size: 100,
+            ...(cursor ? { start_cursor: cursor } : {})
+          })
+        }, signal));
+        for (const page of response.results || []) {
+          const id = propertyText(page.properties?.["外部 ID"]);
+          if (id) pages.set(id, page);
+        }
+        cursor = response.has_more ? response.next_cursor : null;
+      } while (cursor);
+    }
+    return pages;
+  } catch (error) {
+    if (signal?.aborted) throw error;
+    console.warn("Notion 批量比对失败，改用逐条查询", error);
+    return null;
+  }
+}
 function pause(milliseconds, signal) { return new Promise((resolve, reject) => { throwIfAborted(signal); const timer=setTimeout(done,milliseconds); function abort(){clearTimeout(timer);reject(new Error("同步已停止"));} function done(){signal?.removeEventListener("abort",abort);resolve();} signal?.addEventListener("abort",abort,{once:true}); }); }
 async function timedFetch(url, init, timeoutMs, label, readBody) {
   const parentSignal = init.signal;
