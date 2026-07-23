@@ -6,7 +6,7 @@
 
   <p>
     <a href="https://github.com/zengyincen/TunNest/actions/workflows/ci.yml"><img src="https://github.com/zengyincen/TunNest/actions/workflows/ci.yml/badge.svg" alt="TunNest CI"></a>
-    <img src="https://img.shields.io/badge/release-v1.4.1-1D1D1F?style=flat-square" alt="Release v1.4.1">
+    <img src="https://img.shields.io/badge/release-v1.4.2-1D1D1F?style=flat-square" alt="Release v1.4.2">
     <img src="https://img.shields.io/badge/Chrome-Manifest_V3-4285F4?style=flat-square&logo=googlechrome&logoColor=white" alt="Chrome Manifest V3">
     <img src="https://img.shields.io/badge/同步来源-4-30D158?style=flat-square" alt="4 个同步来源">
     <img src="https://img.shields.io/badge/完整试用-7_天-FF9F0A?style=flat-square" alt="7 天完整试用">
@@ -248,7 +248,9 @@ Token 相当于进入数据库的钥匙，不要提交到 GitHub 源码，也不
 | 介质 | 选择（Select） | CD、Audio CD、数字介质等 |
 | 流派 | 多选（Multi-select） | 流行、摇滚、民谣等流派 |
 
-豆瓣封面不再逐张下载并上传到 Notion。囤囤会把现有 Cloudflare Worker 生成的缓存代理直链写入“封面”，同时把豆瓣原始地址写入“封面原图”。这不使用 D1、R2 或其他对象存储；首次访问由 Worker 转发，后续由边缘缓存直接返回。
+豆瓣封面不再逐张下载并上传到 Notion。默认模式会把现有 Cloudflare Worker 生成的缓存代理直链写入“封面”，同时把豆瓣原始地址写入“封面原图”。这不使用 D1、R2 或其他对象存储；首次访问由 Worker 转发，后续由边缘缓存直接返回。
+
+也可以在设置中选择 `LitHub 托管优先`。TunNest 先用一个已知电影 ID 做一次健康检查，成功后直接按 `https://dou.img.lithub.cc/<movie|book|music>/<豆瓣ID>.jpg` 为整批条目生成短直链，不逐张探测或下载；检查失败会自动回退 Cloudflare，不把失效链接写入 Notion。LitHub 是第三方社区服务，历史上出现过额度耗尽、连接失败和证书过期，因此不作为强制默认源。
 
 ### 微博博文数据库
 
@@ -315,7 +317,7 @@ GitHub Actions 无法复用浏览器登录，因此自动同步微信读书时 `
 
 TMDB 只用于电影，不替换图书和音乐封面。设置页提供三种模式：
 
-- `豆瓣缓存代理`：默认模式，不请求 TMDB；
+- `不使用 TMDB`：默认模式，沿用上方选择的 Cloudflare 或 LitHub 豆瓣封面源；
 - `TMDB 优先，豆瓣兜底`：按中文片名和年份精确匹配，匹配成功后使用 `image.tmdb.org` 的 `w500` 海报；
 - `豆瓣优先，TMDB 兜底`：只有豆瓣没有有效封面时才请求 TMDB。
 
@@ -416,6 +418,7 @@ curl -X PATCH "$LICENSE_API_BASE/v1/admin/licenses/lic_xxx" \
 | 名称 | 必填 | 示例 |
 |---|:---:|---|
 | `LICENSE_API_BASE` | ✅ | `https://license.example.com`，末尾不要加 `/` |
+| `DOUBAN_IMAGE_PROVIDER` | 可选 | `cloudflare` 或 `lithub-first`；默认 `cloudflare` |
 | `MOVIE_COVER_PROVIDER` | 可选 | `douban`、`tmdb-first` 或 `tmdb-fallback`；默认 `douban` |
 
 ### 3. 配置 Secrets
@@ -437,7 +440,7 @@ curl -X PATCH "$LICENSE_API_BASE/v1/admin/licenses/lic_xxx" \
 | `TMDB_ACCESS_TOKEN` | TMDB 模式 | TMDB API Read Access Token；默认豆瓣模式无需配置 |
 | `LICENSE_ADMIN_TOKEN` | 仅发码 | 管理员密钥；每日同步本身不读取 |
 
-`DOUBAN_API_KEY` 从 `v1.2.14` 起不再需要，可以删除。要让 Actions 使用 TMDB，把 Repository Variable `MOVIE_COVER_PROVIDER` 设为 `tmdb-first` 或 `tmdb-fallback`，再创建同名 Secret `TMDB_ACCESS_TOKEN`。旧版 `NOTION_DATABASE_ID` 只作为兼容回退，不建议新配置继续使用。
+`DOUBAN_API_KEY` 从 `v1.2.14` 起不再需要，可以删除。要让 Actions 优先尝试 LitHub，把 Repository Variable `DOUBAN_IMAGE_PROVIDER` 设为 `lithub-first`；健康检查失败时会自动使用 Cloudflare。要使用 TMDB，把 `MOVIE_COVER_PROVIDER` 设为 `tmdb-first` 或 `tmdb-fallback`，再创建同名 Secret `TMDB_ACCESS_TOKEN`。旧版 `NOTION_DATABASE_ID` 只作为兼容回退，不建议新配置继续使用。
 
 ### 4. 手动测试工作流
 
@@ -477,7 +480,7 @@ schedule:
 
 ```bash
 git add .
-git commit -m "release: TunNest v1.4.1"
+git commit -m "release: TunNest v1.4.2"
 git push origin main
 ```
 
@@ -495,9 +498,9 @@ npm run package
 使用 GitHub CLI 创建 Release：
 
 ```bash
-gh release create v1.4.1 dist/tunnest-extension.zip \
-  --title "TunNest v1.4.1" \
-  --notes "囤囤 TunNest v1.4.1"
+gh release create v1.4.2 dist/tunnest-extension.zip \
+  --title "TunNest v1.4.2" \
+  --notes "囤囤 TunNest v1.4.2"
 ```
 
 推荐同时保留完整源码仓库和 Release ZIP：源码便于审计、Issue 与 Actions，Release 便于普通用户安装。Cloudflare Secret、GitHub Secret 和 Notion Token 都不会被打进 ZIP，仍需要按本文单独配置。

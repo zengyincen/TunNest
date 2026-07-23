@@ -2,7 +2,7 @@ import { syncItems } from "./lib/notion.mjs";
 import { getWereadItems } from "./sources/weread.mjs";
 import { getDoubanItems } from "./sources/douban.mjs";
 import { DOUBAN_TOP250_TARGETS, fetchAllDoubanTop250 } from "../extension/lib/douban-top250.js";
-import { enrichMovieCovers } from "../extension/lib/cover-providers.js";
+import { enrichDoubanHostedCovers, enrichMovieCovers } from "../extension/lib/cover-providers.js";
 
 const source=(process.env.SOURCE||"all").toLowerCase();
 if(!["all","weread","douban"].includes(source))throw new Error("SOURCE 仅支持 all、weread 或 douban");
@@ -15,11 +15,13 @@ if(source==="all"||source==="weread"){
   failedCount+=await syncSource("weread",databaseId("WEREAD"),items);
 }
 if(source==="all"||source==="douban"){
-  const provider=process.env.MOVIE_COVER_PROVIDER||"douban",tmdbAccessToken=process.env.TMDB_ACCESS_TOKEN;
-  const userResult=await enrichMovieCovers(await getDoubanItems({userId:required("DOUBAN_USER_ID"),authToken:process.env.DOUBAN_AUTH_TOKEN,apiHost:process.env.DOUBAN_API_HOST}),{provider,tmdbAccessToken,onProgress:tmdbProgress});
+  const provider=process.env.MOVIE_COVER_PROVIDER||"douban",tmdbAccessToken=process.env.TMDB_ACCESS_TOKEN,doubanImageProvider=process.env.DOUBAN_IMAGE_PROVIDER||"cloudflare";
+  const hostedUser=await enrichDoubanHostedCovers(await getDoubanItems({userId:required("DOUBAN_USER_ID"),authToken:process.env.DOUBAN_AUTH_TOKEN,apiHost:process.env.DOUBAN_API_HOST}),{provider:doubanImageProvider,onStatus:console.log});
+  const userResult=await enrichMovieCovers(hostedUser.items,{provider,tmdbAccessToken,onProgress:tmdbProgress});
   const items=userResult.items;
   failedCount+=await syncSource("douban",databaseId("DOUBAN"),items);
   const top250=await fetchAllDoubanTop250({headers:{"User-Agent":"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/138.0 Safari/537.36"}});
+  for(const target of DOUBAN_TOP250_TARGETS)top250[target.source]=(await enrichDoubanHostedCovers(top250[target.source],{provider:doubanImageProvider,onStatus:console.log})).items;
   const movieResult=await enrichMovieCovers(top250.doubanMovieTop250,{provider,tmdbAccessToken,onProgress:tmdbProgress});
   top250.doubanMovieTop250=movieResult.items;
   for(const target of DOUBAN_TOP250_TARGETS){

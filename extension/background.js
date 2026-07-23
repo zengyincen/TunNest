@@ -1,5 +1,5 @@
 import { entitlement } from "./lib/license.js";
-import { enrichMovieCovers } from "./lib/cover-providers.js";
+import { enrichDoubanHostedCovers, enrichMovieCovers } from "./lib/cover-providers.js";
 import { DOUBAN_TOP250_TARGETS, fetchAllDoubanTop250 } from "./lib/douban-top250.js";
 import { createArchiveDatabase, syncItems, verifyNotion } from "./lib/notion.js";
 import { extractCurrentPage, fetchDouban, fetchWeiboDesktopInPage, fetchWeiboInPage, fetchWeread, fetchWereadInPage } from "./lib/sources.js";
@@ -51,7 +51,7 @@ async function runSource(source, tabId, signal, runId) {
   try {
     const access = await entitlement(); if (!access.active) throw new Error(access.error || "需要有效订阅才能同步");
     if (source === "weibo" || source === "douban") await remoteHeadersReady.catch((error) => console.warn("远程请求头规则初始化失败", error));
-    const settings = await chrome.storage.local.get(["notionToken", "notionDatabaseIds", "notionDatabaseId", "wereadApiKey", "doubanUserId", "doubanAuthToken", "movieCoverProvider", "tmdbAccessToken", "tmdbCoverCache", "weiboUids", "weiboPages"]);
+    const settings = await chrome.storage.local.get(["notionToken", "notionDatabaseIds", "notionDatabaseId", "wereadApiKey", "doubanUserId", "doubanAuthToken", "doubanImageProvider", "movieCoverProvider", "tmdbAccessToken", "tmdbCoverCache", "weiboUids", "weiboPages"]);
     const databaseIds = databaseMap(settings), databaseId = databaseIds[source];
     if (!settings.notionToken) throw new Error("请先填写 Notion Integration Token");
     if (source === "douban") {
@@ -71,6 +71,14 @@ async function runSource(source, tabId, signal, runId) {
         onProgress: ({ label, completedPages, totalPages }) => updateSyncState({ detail: `正在读取豆瓣${label} Top 250 · ${completedPages + 1}/${totalPages} 页` }, runId)
       });
       batches = [{ target: "douban", items: userItems }, ...DOUBAN_TOP250_TARGETS.map(({ source: target }) => ({ target, items: top250[target] }))];
+      for (const batch of batches) {
+        const hosted = await enrichDoubanHostedCovers(batch.items, {
+          provider: settings.doubanImageProvider,
+          signal,
+          onStatus: (detail) => updateSyncState({ detail }, runId)
+        });
+        batch.items = hosted.items;
+      }
       if ((settings.movieCoverProvider || "douban") !== "douban") {
         let cache = settings.tmdbCoverCache || {};
         for (const batch of batches.filter((entry) => entry.target === "douban" || entry.target === "doubanMovieTop250")) {
@@ -255,7 +263,7 @@ function waitForTab(tabId, timeoutMessage = "微博页面加载超时") {
   });
 }
 async function status() { const access = await entitlement(); const settings = await chrome.storage.local.get(["notionToken", "notionDatabaseIds", "notionDatabaseId", "syncState"]),ids=databaseMap(settings),targets=["clip","weread",...DOUBAN_DATABASE_SOURCES,"weibo"],notionSources=Object.fromEntries(["clip","weread","douban","weibo"].map(source=>[source,!!(settings.notionToken&&(source==="douban"?DOUBAN_DATABASE_SOURCES.every(target=>ids[target]):ids[source]))])),notionDatabaseCount=targets.filter(target=>settings.notionToken&&ids[target]).length,notionDatabaseTotal=targets.length,syncState=normalizeSyncState(settings.syncState);if(settings.syncState?.status==="running"&&syncState?.status!=="running")await setSyncState(syncState);return { ok: true, access, notionConnected:notionDatabaseCount>0, notionDatabaseCount, notionDatabaseTotal, notionSources, syncState }; }
-async function saveSettings(settings) { const allowed = ["wereadApiKey", "doubanUserId", "doubanAuthToken", "movieCoverProvider", "tmdbAccessToken", "weiboUids", "weiboPages"]; await chrome.storage.local.set(Object.fromEntries(allowed.filter((key) => key in settings).map((key) => [key, settings[key]]))); return { ok: true }; }
+async function saveSettings(settings) { const allowed = ["wereadApiKey", "doubanUserId", "doubanAuthToken", "doubanImageProvider", "movieCoverProvider", "tmdbAccessToken", "weiboUids", "weiboPages"]; await chrome.storage.local.set(Object.fromEntries(allowed.filter((key) => key in settings).map((key) => [key, settings[key]]))); return { ok: true }; }
 async function setupNotion(message) { const source=message.source;if(!["clip","weread","douban","doubanMovieTop250","doubanBookTop250","doubanMusicTop250","weibo"].includes(source))throw new Error("未知 Notion 数据库类型");if (!message.notionToken) throw new Error("缺少 Notion Token"); let databaseId = message.databaseId; if (!databaseId) databaseId = await createArchiveDatabase(message.notionToken, message.parentPage,source); const database = await verifyNotion(message.notionToken, databaseId,source),stored=await chrome.storage.local.get("notionDatabaseIds"),notionDatabaseIds={...(stored.notionDatabaseIds||{}),[source]:database.id}; await chrome.storage.local.set({ notionToken: message.notionToken, notionDatabaseIds }); return { ok: true, database }; }
 async function addHistory(entry) { const { syncHistory = [] } = await chrome.storage.local.get("syncHistory"); await chrome.storage.local.set({ syncHistory: [entry, ...syncHistory].slice(0, 30) }); }
 async function recent() { const { syncHistory = [] } = await chrome.storage.local.get("syncHistory"); return { ok: true, items: syncHistory.slice(0, 8) }; }
