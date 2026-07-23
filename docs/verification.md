@@ -4,7 +4,7 @@
 
 ## 已通过
 
-- 根项目 10 个测试：中英文品牌名、套餐价格、Action 来源边界、豆瓣标准化、四数据库字段、按来源路由、Actions 独立数据库、Notion Emoji 载荷、7 天试用、付费 Action 限制
+- 根项目 18 个测试：中英文品牌名、套餐价格、Action 来源边界、豆瓣标准化、四数据库字段、按来源路由、Actions 独立数据库、Notion Emoji/File Upload 图片载荷、微博图片失败防丢失、桌面与移动适配、长微博全文、原图配图、弹窗首次点击、后台进度恢复、7 天试用、付费 Action 限制
 - 全部 JavaScript/MJS `node --check`
 - 扩展 manifest、图标和 Noto Sans SC 字体资源完整性
 - 扩展 ZIP 完整性检查
@@ -23,7 +23,7 @@
 
 - 微信读书真实 Gateway API Key
 - 豆瓣真实用户 ID/API Key/Auth Token
-- 微博真实浏览器登录态与不同用户主页
+- 微博真实浏览器登录态、验证码/432 风控状态、长微博全文、原图显示与不同用户主页（发布前人工验收）
 - Notion Integration Token 与正式数据库
 - Chrome Web Store 正式审核
 - 支付平台购买链接和付款后的自动发码集成

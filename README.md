@@ -6,7 +6,7 @@
 
   <p>
     <a href="../../actions/workflows/ci.yml"><img src="../../actions/workflows/ci.yml/badge.svg" alt="TunNest CI"></a>
-    <img src="https://img.shields.io/badge/release-v1.2.0-1D1D1F?style=flat-square" alt="Release v1.2.0">
+    <img src="https://img.shields.io/badge/release-v1.2.13-1D1D1F?style=flat-square" alt="Release v1.2.13">
     <img src="https://img.shields.io/badge/Chrome-Manifest_V3-4285F4?style=flat-square&logo=googlechrome&logoColor=white" alt="Chrome Manifest V3">
     <img src="https://img.shields.io/badge/同步来源-4-30D158?style=flat-square" alt="4 个同步来源">
     <img src="https://img.shields.io/badge/完整试用-7_天-FF9F0A?style=flat-square" alt="7 天完整试用">
@@ -50,7 +50,7 @@
 |---|---|:---:|:---:|
 | 微信读书 | 书籍、阅读状态、划线、笔记 | ✅ | ✅ Gateway API Key |
 | 豆瓣 | 书 / 影 / 音状态、评分、短评 | ✅ 实验性 | ✅ Frodo 内部接口（实验性） |
-| 微博 | 指定用户博文，适合建立公开内容收藏档案 | ✅ 浏览器登录态 | — 风控较高，不自动抓取 |
+| 微博 | 指定用户博文、完整长文、原图配图与转发内容 | ✅ 浏览器登录态 | — 风控较高，不自动抓取 |
 | 任意网页 | 标题、链接、正文与选区 | ✅ 一键剪藏 | — 无稳定自动来源 |
 
 微博内容一旦成功写入你的 Notion，就不再依赖信息流排序；但源内容版权仍属于原作者，源站删除、账号权限变化或平台风控都可能影响后续同步。
@@ -114,12 +114,12 @@ npm run package
 
 | 数据库 | 专属字段示例 |
 |---|---|
-| 囤囤 · 网页剪藏 | 标题、类型、原文、作者、摘要、收藏时间 |
-| 囤囤 · 微信读书 | 书名、作者、原书链接、划线数量、同步时间 |
-| 囤囤 · 豆瓣书影音 | 名称、类型、状态、评分、短评、收藏时间 |
-| 囤囤 · 微博博文 | 博文、用户、正文摘要、转发数、评论数、点赞数、发布时间 |
+| 囤囤 · 网页剪藏 | 标题、封面、类型、原文、作者、摘要、收藏时间 |
+| 囤囤 · 微信读书 | 书名、封面、作者、原书链接、划线数量、同步时间 |
+| 囤囤 · 豆瓣书影音 | 名称、封面、类型、状态、评分、短评、收藏时间 |
+| 囤囤 · 微博博文 | 博文、封面、用户、正文摘要、转发数、评论数、点赞数、发布时间 |
 
-四个数据库可以放在不同父页面。留空数据库 ID 时扩展会自动创建完整字段；连接已有数据库时，属性名称与类型必须匹配。完整清单见 [安装与 Notion 配置](docs/setup.md)。
+四个数据库都使用“封面”文件与媒体属性。网页保存 OG 图、微信读书保存书封、豆瓣保存海报、微博保存第一张配图。连接或同步已有数据库时，囤囤会自动统一标题列名称并补建全部缺失属性；只有同名但类型错误的冲突字段需要人工处理。完整清单见 [安装与 Notion 配置](docs/setup.md)。
 
 ## ✦ 订阅方案
 
@@ -211,7 +211,7 @@ npm run sync      # 本地运行自动同步
 为了不把“能演示”写成“永远稳定”，这些限制需要提前说明：
 
 - 上游非公开接口可能变更，真实账号首次使用前应按 [验证记录](docs/verification.md) 测试；
-- 微博可能出现频率限制、验证码或 HTTP 432，只支持浏览器主动同步；
+- 微博只支持浏览器主动同步。扩展优先在已登录的 `weibo.com` 页面内使用桌面信息流接口，并以移动页面接口作为回退，不会读取或上传 Cookie。若出现验证码、频率限制或 HTTP 432，请在微博页面完成验证后稍候重试；
 - 网页剪藏效果取决于页面结构，强交互、付费墙或登录后页面可能无法完整提取；
 - GitHub Actions 需要用户自行提供 Notion 与来源平台 Secrets；
 - 当前扩展尚未完成 Chrome Web Store 正式审核；

@@ -3,9 +3,9 @@ import { activateLicense, deactivateCurrentDevice, entitlement } from "./lib/lic
 
 const $ = (selector) => document.querySelector(selector);
 const notionSources=["clip","weread","douban","weibo"];
-const keys = ["licenseKey","notionToken","notionDatabaseIds","notionDatabaseId","doubanUserId","doubanApiKey","doubanAuthToken","weiboUids","weiboPages"];
+const keys = ["licenseKey","notionToken","notionDatabaseIds","notionDatabaseId","wereadApiKey","doubanUserId","doubanApiKey","doubanAuthToken","weiboUids","weiboPages"];
 const stored = await chrome.storage.local.get(keys);
-for (const key of ["licenseKey","notionToken","doubanUserId","doubanApiKey","doubanAuthToken","weiboUids","weiboPages"]) if ($(`#${key}`)) $(`#${key}`).value = stored[key] || $(`#${key}`).value || "";
+for (const key of ["licenseKey","notionToken","wereadApiKey","doubanUserId","doubanApiKey","doubanAuthToken","weiboUids","weiboPages"]) if ($(`#${key}`)) $(`#${key}`).value = stored[key] || $(`#${key}`).value || "";
 const notionDatabaseIds={...(stored.notionDatabaseIds||{})};if(!notionDatabaseIds.clip&&stored.notionDatabaseId)notionDatabaseIds.clip=stored.notionDatabaseId;
 for(const source of notionSources)$(`#${source}DatabaseId`).value=notionDatabaseIds[source]||"";
 renderPlans();
@@ -24,6 +24,7 @@ $("#deactivateDevice").addEventListener("click", async () => {
 });
 
 $("#installationCode").addEventListener("click", () => navigator.clipboard.writeText($("#installationCode").textContent));
+$("#openWeread").addEventListener("click", () => chrome.tabs.create({ url: "https://weread.qq.com/" }));
 document.querySelectorAll("[data-notion-source]").forEach((button)=>button.addEventListener("click",async()=>{
   const source=button.dataset.notionSource,prefix=`${source}Notion`;setToast(prefix,"正在连接…");button.disabled=true;
   const result=await chrome.runtime.sendMessage({type:"SETUP_NOTION",source,notionToken:$("#notionToken").value.trim(),parentPage:$(`#${source}ParentPage`).value.trim(),databaseId:$(`#${source}DatabaseId`).value.trim()});
@@ -31,7 +32,7 @@ document.querySelectorAll("[data-notion-source]").forEach((button)=>button.addEv
   button.disabled=false;
 }));
 $("#saveSources").addEventListener("click", async () => {
-  const settings=Object.fromEntries(["doubanUserId","doubanApiKey","doubanAuthToken","weiboUids","weiboPages"].map((key)=>[key,$(`#${key}`).value.trim()]));
+  const settings=Object.fromEntries(["wereadApiKey","doubanUserId","doubanApiKey","doubanAuthToken","weiboUids","weiboPages"].map((key)=>[key,$(`#${key}`).value.trim()]));
   const result=await chrome.runtime.sendMessage({type:"SAVE_SETTINGS",settings}); setToast("source",result.ok?"设置已保存":result.error,!result.ok);
 });
 
