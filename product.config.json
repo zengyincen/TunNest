@@ -1,7 +1,7 @@
 {
   "product": "TunNest",
   "displayName": "囤囤",
-  "version": "1.4.3",
+  "version": "1.4.4",
   "trialDays": 7,
   "browserDeviceLimit": 3,
   "actionsLimit": 1,

@@ -4,6 +4,7 @@ const VERSION = "2022-06-28";
 const FILE_VERSION = "2026-03-11";
 const MANAGED_IMAGE_CAPTION = "TunNest · ";
 const MANAGED_BLOCK_MARKER = "\u2063\u200b\u2063";
+const MANAGED_CLIP_MEDIA_HREF = "https://github.com/zengyincen/TunNest#clip-media-";
 let nextRequestAt = 0;
 let notionRequestTail = Promise.resolve();
 const ensuredDatabaseSchemas = new Map();
@@ -98,11 +99,10 @@ export async function contentFingerprint(item, source = item?.source || "") {
     tags: item?.tags || [],
     highlights: item?.highlights || [],
     images: item?.images || [],
+    media: item?.media || [],
     metadata: item?.metadata || {}
   };
-  const bytes = new TextEncoder().encode(stableJson(payload));
-  const digest = await globalThis.crypto.subtle.digest("SHA-256", bytes);
-  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
+  return sha256(stableJson(payload));
 }
 
 export async function syncItems(token, databaseId, items, source, onProgress = () => {}, options = {}) {
@@ -152,6 +152,7 @@ async function upsertItem(token, databaseId, item, source, context = {}) {
     && (!isDoubanSource(source) || !isDoubanImageUrl(representativeImageUrl(item)) || coverAlreadyAccelerated(existingPage));
   if (unchanged) {
     if (source === "weibo" && item.images?.length) await syncUploadedImages(token, existingPage.id, item, context);
+    if (source === "clip" && item.media?.length) await syncClipMedia(token, existingPage.id, item, context);
     await onDetail("内容未变化，已跳过写入");
     return existingPage.id;
   }
@@ -173,10 +174,12 @@ async function upsertItem(token, databaseId, item, source, context = {}) {
     if (source === "weibo") await syncUploadedImages(token, existingPage.id, item, context);
     await onDetail("正在更新正文");
     await replaceManagedBlocks(token, existingPage.id, item, signal);
+    if (source === "clip") await syncClipMedia(token, existingPage.id, item, context);
     return existingPage.id;
   }
   const page = await notion(token, "/pages", withSignal({ method: "POST", body: JSON.stringify({ parent: { database_id: databaseId }, properties, ...(cover ? { cover } : {}), ...(!isTop250Source(source) ? { children: [managedBlock(item)] } : {}) }) }, signal), version);
   if (source === "weibo") await syncUploadedImages(token, page.id, item, context);
+  if (source === "clip") await syncClipMedia(token, page.id, item, context);
   return page.id;
 }
 
@@ -318,6 +321,128 @@ async function syncUploadedImages(token, pageId, item, context = {}) {
   for (const block of [...managedImages, ...managedFallbacks]) await notion(token, `/blocks/${block.id}`, withSignal({ method: "DELETE" }, signal));
 }
 
+async function syncClipMedia(token, pageId, item, context = {}) {
+  const { signal, onDetail = () => {} } = context;
+  const media = await normalizedClipMedia(item.media || []);
+  const children = await notion(token, `/blocks/${pageId}/children?page_size=100`, withSignal({}, signal));
+  const managed = (children.results || []).map(managedClipMediaInfo).filter(Boolean);
+  const successful = new Map(), keepIds = new Set();
+  for (const entry of managed) if (entry.success && !successful.has(entry.key)) successful.set(entry.key, entry.block);
+  const pending = [];
+  for (const entry of media) {
+    const existing = successful.get(entry.key);
+    if (existing) keepIds.add(existing.id);
+    else pending.push(entry);
+  }
+
+  const created = new Array(pending.length), remoteFailures = [];
+  let next = 0, completed = 0;
+  async function worker() {
+    while (next < pending.length) {
+      const index = next++, entry = pending[index];
+      throwIfAborted(signal);
+      try {
+        await onDetail(`正在导入网页${mediaTypeLabel(entry.type)} ${completed + 1}/${pending.length}`);
+        const uploadId = await importClipMedia(token, entry, signal);
+        created[index] = clipMediaBlock(entry, { type: "file_upload", file_upload: { id: uploadId } });
+      } catch (error) {
+        if (signal?.aborted) throw error;
+        remoteFailures.push(`${entry.caption}：${error.message}`);
+        created[index] = clipMediaBlock(entry, { type: "external", external: { url: entry.url } });
+      }
+      completed++;
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(3, pending.length) }, worker));
+
+  if (created.length) {
+    try {
+      await onDetail(`正在写入 ${created.length} 个网页媒体文件`);
+      await notion(token, `/blocks/${pageId}/children`, withSignal({ method: "PATCH", body: JSON.stringify({ children: created }) }, signal), FILE_VERSION);
+    } catch (error) {
+      if (signal?.aborted) throw error;
+      await notion(token, `/blocks/${pageId}/children`, withSignal({ method: "PATCH", body: JSON.stringify({ children: pending.map(clipMediaFallbackBlock) }) }, signal));
+      remoteFailures.push(`Notion 媒体块创建失败：${error.message}`);
+    }
+  }
+
+  for (const entry of managed) if (!keepIds.has(entry.block.id)) {
+    await notion(token, `/blocks/${entry.block.id}`, withSignal({ method: "DELETE" }, signal));
+  }
+  if (remoteFailures.length) await onDetail(`部分媒体改用外链或原文件链接：${remoteFailures[0]}`);
+}
+
+async function normalizedClipMedia(values) {
+  const media = [], seen = new Set(), counts = { image: 0, video: 0, audio: 0 }, limits = { image: 20, video: 4, audio: 4 };
+  for (const value of values) {
+    const type = ["image", "video", "audio"].includes(value?.type) ? value.type : "";
+    const url = normalizeImageUrl(value?.url);
+    if (!type || !url || seen.has(url) || media.length >= 24 || counts[type] >= limits[type]) continue;
+    seen.add(url); counts[type]++;
+    media.push({ type, url, caption: String(value?.caption || `网页${mediaTypeLabel(type)} ${counts[type]}`).slice(0, 240), key: (await sha256(url)).slice(0, 20) });
+  }
+  return media;
+}
+
+async function importClipMedia(token, media, signal) {
+  let imported = await notion(token, "/file_uploads", {
+    method: "POST",
+    body: JSON.stringify({ mode: "external_url", external_url: media.url, filename: clipMediaFilename(media) }),
+    signal
+  }, FILE_VERSION);
+  for (let attempt = 0; imported.status === "pending" && attempt < 12; attempt++) {
+    await pause(1000, signal);
+    imported = await notion(token, `/file_uploads/${imported.id}`, withSignal({}, signal), FILE_VERSION);
+  }
+  if (imported.status !== "uploaded") {
+    const detail = typeof imported.file_import_result === "string" ? imported.file_import_result : imported.status || "导入超时";
+    throw new Error(`Notion 远程导入失败（${detail}）`);
+  }
+  return imported.id;
+}
+
+function clipMediaBlock(media, file) {
+  return { object: "block", type: media.type, [media.type]: { ...file, caption: clipMediaCaption(media) } };
+}
+
+function clipMediaFallbackBlock(media) {
+  return {
+    object: "block", type: "paragraph",
+    paragraph: { rich_text: [clipMediaMarker(media.key), { type: "text", text: { content: `媒体导入失败 · ${media.caption}（打开原文件）`, link: { url: media.url } } }] }
+  };
+}
+
+function clipMediaCaption(media) {
+  return [clipMediaMarker(media.key), ...rich(media.caption, 1800)];
+}
+
+function clipMediaMarker(key) {
+  return { type: "text", text: { content: MANAGED_BLOCK_MARKER, link: { url: `${MANAGED_CLIP_MEDIA_HREF}${key}` } } };
+}
+
+function managedClipMediaInfo(block) {
+  const payload = ["image", "video", "audio"].includes(block.type) ? block[block.type]?.caption : block.type === "paragraph" ? block.paragraph?.rich_text : null;
+  if (!payload) return null;
+  const marker = payload.find((part) => (part.plain_text || part.text?.content || "").includes(MANAGED_BLOCK_MARKER));
+  const href = marker?.href || marker?.text?.link?.url || "";
+  if (!href.startsWith(MANAGED_CLIP_MEDIA_HREF)) return null;
+  return { block, key: href.slice(MANAGED_CLIP_MEDIA_HREF.length), success: ["image", "video", "audio"].includes(block.type) };
+}
+
+function clipMediaFilename(media) {
+  let extension = "";
+  try { extension = new URL(media.url).pathname.match(/\.([a-z0-9]{2,5})$/i)?.[1]?.toLowerCase() || ""; } catch { /* URL was normalized earlier. */ }
+  const allowed = {
+    image: ["jpg", "jpeg", "png", "gif", "webp", "avif", "svg"],
+    video: ["mp4", "mov", "webm", "m4v", "ogv"],
+    audio: ["mp3", "m4a", "wav", "ogg", "oga", "aac", "flac"]
+  };
+  if (!allowed[media.type].includes(extension)) extension = ({ image: "jpg", video: "mp4", audio: "mp3" })[media.type];
+  return `tunnest-web-${media.type}-${media.key}.${extension}`;
+}
+
+function mediaTypeLabel(type) { return ({ image: "图片", video: "视频", audio: "音频" })[type] || "媒体"; }
+
 async function uploadImage(token, url, index, signal, onDetail = () => {}, source = "weibo") {
   const label = source === "douban" ? "豆瓣封面" : "微博配图";
   let parsed;
@@ -431,6 +556,10 @@ function stableJson(value) {
   if (Array.isArray(value)) return `[${value.map((item) => stableJson(item === undefined ? null : item)).join(",")}]`;
   if (value && typeof value === "object") return `{${Object.keys(value).sort().filter((key) => value[key] !== undefined).map((key) => `${JSON.stringify(key)}:${stableJson(value[key])}`).join(",")}}`;
   return JSON.stringify(value);
+}
+async function sha256(value) {
+  const digest = await globalThis.crypto.subtle.digest("SHA-256", new TextEncoder().encode(String(value)));
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 function ensureDatabaseSchema(token, databaseId, source, signal) {
   const schema=sourceSchema(source),key=`${databaseId}:${source}`;

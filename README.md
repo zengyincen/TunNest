@@ -6,7 +6,7 @@
 
   <p>
     <a href="https://github.com/zengyincen/TunNest/actions/workflows/ci.yml"><img src="https://github.com/zengyincen/TunNest/actions/workflows/ci.yml/badge.svg" alt="TunNest CI"></a>
-    <img src="https://img.shields.io/badge/release-v1.4.3-1D1D1F?style=flat-square" alt="Release v1.4.3">
+    <img src="https://img.shields.io/badge/release-v1.4.4-1D1D1F?style=flat-square" alt="Release v1.4.4">
     <img src="https://img.shields.io/badge/Chrome-Manifest_V3-4285F4?style=flat-square&logo=googlechrome&logoColor=white" alt="Chrome Manifest V3">
     <img src="https://img.shields.io/badge/同步来源-4-30D158?style=flat-square" alt="4 个同步来源">
     <img src="https://img.shields.io/badge/完整试用-7_天-FF9F0A?style=flat-square" alt="7 天完整试用">
@@ -144,7 +144,7 @@ Token 相当于进入数据库的钥匙，不要提交到 GitHub 源码，也不
 | 属性 | Notion 类型 | 用途 |
 |---|---|---|
 | 标题 | 标题（Title） | 网页或文章标题 |
-| 封面 | 文件与媒体（Files & media） | 网页 OG 图片 |
+| 封面 | 文件与媒体（Files & media） | 网页 OG 图片；同时作为正文媒体导入 |
 | 类型 | 选择（Select） | 网页、文章等 |
 | 原文 | URL | 原始链接 |
 | 作者 | 文本（Rich text） | 页面作者 |
@@ -153,6 +153,8 @@ Token 相当于进入数据库的钥匙，不要提交到 GitHub 源码，也不
 | 收藏时间 | 日期（Date） | 剪藏时间 |
 | 外部 ID | 文本（Rich text） | URL 去重键 |
 | 内容指纹 | 文本（Rich text） | 内容未变化时跳过 Notion 写入 |
+
+网页正文中的图片、视频和音频会写入页面内容，不需要额外创建数据库属性。单页最多处理 24 个媒体（图片最多 20 个，视频和音频各最多 4 个）；优先通过 Notion File Upload 远程导入到用户自己的 Notion 空间，失败时改用外链媒体块，再失败则保留可点击的原文件链接。重复媒体不会反复导入，媒体增删会触发更新，失败项在再次剪藏同一网页时会自动重试。
 
 ### 微信读书数据库
 
@@ -283,7 +285,9 @@ Token 相当于进入数据库的钥匙，不要提交到 GitHub 源码，也不
 4. 也可以选中文本后右键，选择“保存到囤囤 TunNest”。
 5. 默认快捷键为 `Alt+Shift+S`；macOS 为 `Control+Shift+S`。
 
-强交互网页、付费墙、跨域 iframe 或登录后动态内容可能无法完整提取。
+剪藏会同时保存正文、选区、正文图片、视频和音频。为避免同步站点图标、头像和追踪像素，明显过小或重复的图片会自动忽略。
+
+强交互网页、付费墙、跨域 iframe、`blob:` / `data:` 媒体或只有登录后才能直接访问的媒体可能无法完整导入；失败时 Notion 页面会保留原文件链接。
 
 ### 微信读书
 
@@ -480,7 +484,7 @@ schedule:
 
 ```bash
 git add .
-git commit -m "release: TunNest v1.4.3"
+git commit -m "release: TunNest v1.4.4"
 git push origin main
 ```
 
@@ -498,9 +502,9 @@ npm run package
 使用 GitHub CLI 创建 Release：
 
 ```bash
-gh release create v1.4.3 dist/tunnest-extension.zip \
-  --title "TunNest v1.4.3" \
-  --notes "囤囤 TunNest v1.4.3"
+gh release create v1.4.4 dist/tunnest-extension.zip \
+  --title "TunNest v1.4.4" \
+  --notes "囤囤 TunNest v1.4.4"
 ```
 
 推荐同时保留完整源码仓库和 Release ZIP：源码便于审计、Issue 与 Actions，Release 便于普通用户安装。Cloudflare Secret、GitHub Secret 和 Notion Token 都不会被打进 ZIP，仍需要按本文单独配置。

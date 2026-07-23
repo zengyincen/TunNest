@@ -380,6 +380,18 @@ export async function fetchWeiboDesktopInPage(uids, requestedPages) {
 export function extractCurrentPage() {
   const get = (selector, attr = "content") => document.querySelector(selector)?.getAttribute(attr)?.trim() || "";
   const find = (...selectors) => { for (const selector of selectors) { const value = document.querySelector(selector)?.textContent?.trim(); if (value) return value; } return ""; };
+  const normalizeMediaUrl = (value) => {
+    try {
+      const url = new URL(String(value || "").trim(), location.href);
+      if (url.protocol !== "https:" || url.href.length > 1900) return "";
+      url.hash = "";
+      return url.href;
+    } catch { return ""; }
+  };
+  const mediaCaption = (element, fallback) => {
+    const figureCaption = element?.closest?.("figure")?.querySelector?.("figcaption")?.textContent?.trim();
+    return (figureCaption || element?.getAttribute?.("alt") || element?.getAttribute?.("title") || element?.getAttribute?.("aria-label") || fallback).trim().slice(0, 240);
+  };
   const selection = window.getSelection()?.toString().trim() || "";
   const canonical = document.querySelector('link[rel="canonical"]')?.href || location.href;
   const title = get('meta[property="og:title"]') || document.title.trim() || location.hostname;
@@ -389,10 +401,40 @@ export function extractCurrentPage() {
   let coverUrl = ""; try { if (coverValue) coverUrl = new URL(coverValue, location.href).href; } catch { /* Invalid page metadata is ignored. */ }
   const root = document.querySelector("article, main, [role=main], #link-report, .WB_detail") || document.body;
   const content = root.innerText.replace(/[\t\u00a0]+/g, " ").replace(/ *\n */g, "\n").replace(/\n{3,}/g, "\n\n").trim().slice(0, 120000);
+  const media = [], seenMedia = new Set(), mediaCounts = { image: 0, video: 0, audio: 0 };
+  const mediaLimits = { image: 20, video: 4, audio: 4 };
+  const addMedia = (type, value, caption, element) => {
+    const url = normalizeMediaUrl(value);
+    if (!url || seenMedia.has(url) || media.length >= 24 || mediaCounts[type] >= mediaLimits[type]) return;
+    if (type === "image" && element) {
+      const width = Number(element.naturalWidth || element.width || element.clientWidth || 0);
+      const height = Number(element.naturalHeight || element.height || element.clientHeight || 0);
+      const hint = `${element.id || ""} ${element.className || ""} ${caption || ""} ${url}`.toLowerCase();
+      if (width && height && (width < 96 || height < 72 || width * height < 14000)) return;
+      if (/(?:avatar|emoji|icon|logo|sprite|badge|tracking|pixel)/.test(hint) && (!width || !height || width * height < 90000)) return;
+    }
+    seenMedia.add(url);
+    mediaCounts[type]++;
+    media.push({ type, url, caption: String(caption || `${({ image: "网页图片", video: "网页视频", audio: "网页音频" })[type]} ${mediaCounts[type]}`).slice(0, 240) });
+  };
+  addMedia("image", coverUrl, "网页封面");
+  for (const image of root.querySelectorAll("img")) {
+    const source = image.currentSrc || image.getAttribute("data-original") || image.getAttribute("data-src") || image.getAttribute("data-lazy-src") || image.src;
+    addMedia("image", source, mediaCaption(image, `网页图片 ${mediaCounts.image + 1}`), image);
+  }
+  for (const video of root.querySelectorAll("video")) {
+    if (video.poster) addMedia("image", video.poster, mediaCaption(video, `视频封面 ${mediaCounts.image + 1}`), video);
+    addMedia("video", video.currentSrc || video.src, mediaCaption(video, `网页视频 ${mediaCounts.video + 1}`), video);
+    for (const source of video.querySelectorAll("source[src]")) addMedia("video", source.src || source.getAttribute("src"), mediaCaption(video, `网页视频 ${mediaCounts.video + 1}`), video);
+  }
+  for (const audio of root.querySelectorAll("audio")) {
+    addMedia("audio", audio.currentSrc || audio.src, mediaCaption(audio, `网页音频 ${mediaCounts.audio + 1}`), audio);
+    for (const source of audio.querySelectorAll("source[src]")) addMedia("audio", source.src || source.getAttribute("src"), mediaCaption(audio, `网页音频 ${mediaCounts.audio + 1}`), audio);
+  }
   const douban = /(^|\.)douban\.com$/.test(location.hostname), weibo = /(^|\.)weibo\.(com|cn)$/.test(location.hostname);
   const kind = douban ? (/movie\.douban\.com\/subject/.test(location.href) ? "movie" : /book\.douban\.com\/subject/.test(location.href) ? "book" : "review") : weibo ? "post" : "webpage";
   const source = douban ? "douban" : weibo ? "weibo" : "web";
-  return { source, kind, externalId: canonical, title, author, url: canonical, excerpt, content, coverUrl, tags: [douban ? "豆瓣" : weibo ? "微博" : "网页"], highlights: selection ? [{ text: selection }] : [], capturedAt: new Date().toISOString() };
+  return { source, kind, externalId: canonical, title, author, url: canonical, excerpt, content, coverUrl, media, tags: [douban ? "豆瓣" : weibo ? "微博" : "网页"], highlights: selection ? [{ text: selection }] : [], capturedAt: new Date().toISOString() };
 }
 
 function doubanItem(interest, type) {

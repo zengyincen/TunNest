@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { readFileSync } from "node:fs";
+import { createHash } from "node:crypto";
 import { NOTION_DATABASE_SCHEMAS, contentFingerprint, syncItems, verifyNotion } from "../extension/lib/notion.js";
 
 const background=readFileSync(new URL("../extension/background.js",import.meta.url),"utf8");
@@ -224,6 +225,8 @@ test("changes the content fingerprint for notes, images, and interaction data",a
   assert.notEqual(await contentFingerprint({...base,metadata:{attitudes:2}},"weibo"),fingerprint);
   const book={kind:"book",externalId:"book-note",title:"书",highlights:[{text:"划线",note:"旧笔记"}]};
   assert.notEqual(await contentFingerprint(book,"weread"),await contentFingerprint({...book,highlights:[{text:"划线",note:"新笔记"}]},"weread"));
+  const clip={kind:"webpage",externalId:"clip-media",title:"网页",media:[{type:"image",url:"https://cdn.example/a.jpg",caption:"图片"}]};
+  assert.notEqual(await contentFingerprint(clip,"clip"),await contentFingerprint({...clip,media:[{type:"video",url:"https://cdn.example/a.mp4",caption:"视频"}]},"clip"));
 });
 
 test("updates properties and managed body when an existing item changes",async()=>{
@@ -371,5 +374,60 @@ test("keeps the old content and a source link when image upload fails",async()=>
     assert.equal(fallback.type,"paragraph");
     assert.equal(fallback.paragraph.rich_text[0].text.link.url,"https://wx1.sinaimg.cn/large/b.jpg");
     assert.equal(calls.some(call=>call.url.endsWith("/blocks/old-toggle")&&call.init.method==="DELETE"),false);
+  }finally{globalThis.fetch=previousFetch;}
+});
+
+test("imports clipped webpage images, video and audio as native Notion blocks",async()=>{
+  const previousFetch=globalThis.fetch,calls=[];
+  let uploadIndex=0;
+  globalThis.fetch=async(url,init={})=>{
+    calls.push({url:String(url),init});
+    const value=String(url);let data={};
+    if(value.endsWith("/query"))data={results:[]};
+    else if(value.includes("/databases/")&&init.method!=="PATCH")data=databaseData("clip");
+    else if(value.endsWith("/pages"))data={id:"clip-page"};
+    else if(value.includes("/blocks/clip-page/children")&&init.method!=="PATCH")data={results:[]};
+    else if(value.endsWith("/file_uploads"))data={id:`clip-upload-${++uploadIndex}`,status:"uploaded"};
+    return{ok:true,status:200,json:async()=>data};
+  };
+  try{
+    const media=[
+      {type:"image",url:"https://cdn.example.com/article.jpg",caption:"文章图片"},
+      {type:"video",url:"https://cdn.example.com/interview.mp4",caption:"访谈视频"},
+      {type:"audio",url:"https://cdn.example.com/podcast.mp3",caption:"播客音频"}
+    ];
+    const result=await syncItems("token","a".repeat(32),[{source:"clip",kind:"webpage",externalId:"clip-with-media",title:"媒体网页",url:"https://example.com/media",content:"正文",media,tags:["网页"],capturedAt:"2026-07-23T00:00:00Z"}],"clip");
+    assert.equal(result[0].ok,true);
+    const imports=calls.filter(call=>call.url.endsWith("/file_uploads")).map(call=>JSON.parse(call.init.body));
+    assert.deepEqual(imports.map(({mode,external_url})=>({mode,external_url})),media.map(({url})=>({mode:"external_url",external_url:url})));
+    const append=calls.find(call=>call.url.includes("/blocks/clip-page/children")&&call.init.method==="PATCH");
+    const blocks=JSON.parse(append.init.body).children;
+    assert.deepEqual(blocks.map(block=>block.type),["image","video","audio"]);
+    assert.deepEqual(blocks.map(block=>block[block.type].type),["file_upload","file_upload","file_upload"]);
+    assert.equal(append.init.headers["Notion-Version"],"2026-03-11");
+    assert.doesNotMatch(JSON.stringify(blocks),/TunNest · 网页媒体/);
+  }finally{globalThis.fetch=previousFetch;}
+});
+
+test("retries a failed webpage media fallback without rewriting unchanged content",async()=>{
+  const previousFetch=globalThis.fetch,calls=[],url="https://cdn.example.com/retry.jpg";
+  const item={source:"clip",kind:"webpage",externalId:"clip-retry",title:"重试媒体",url:"https://example.com/retry",content:"正文",media:[{type:"image",url,caption:"待重试图片"}],tags:["网页"]};
+  const fingerprint=await contentFingerprint(item,"clip");
+  const key=createHash("sha256").update(url).digest("hex").slice(0,20);
+  globalThis.fetch=async(request,init={})=>{
+    calls.push({url:String(request),init});
+    const value=String(request);let data={};
+    if(value.endsWith("/query"))data={results:[{id:"clip-retry-page",properties:{"内容指纹":{rich_text:[{plain_text:fingerprint}]}}}]};
+    else if(value.includes("/databases/")&&init.method!=="PATCH")data=databaseData("clip");
+    else if(value.includes("/blocks/clip-retry-page/children")&&init.method!=="PATCH")data={results:[{id:"old-media-fallback",type:"paragraph",paragraph:{rich_text:[{plain_text:"\u2063\u200b\u2063",href:`https://github.com/zengyincen/TunNest#clip-media-${key}`},{plain_text:"媒体导入失败"}]}}]};
+    else if(value.endsWith("/file_uploads"))data={id:"retry-upload",status:"uploaded"};
+    return{ok:true,status:200,json:async()=>data};
+  };
+  try{
+    const result=await syncItems("token","a".repeat(32),[item],"clip");
+    assert.equal(result[0].ok,true);
+    assert.ok(calls.some(call=>call.url.endsWith("/file_uploads")));
+    assert.ok(calls.some(call=>call.url.endsWith("/blocks/old-media-fallback")&&call.init.method==="DELETE"));
+    assert.equal(calls.some(call=>call.url.endsWith("/pages/clip-retry-page")),false);
   }finally{globalThis.fetch=previousFetch;}
 });
