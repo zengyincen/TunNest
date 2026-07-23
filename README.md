@@ -18,7 +18,7 @@
     <a href="#notion-setup">Notion setup</a> ·
     <a href="#cloudflare-license-service">Cloudflare</a> ·
     <a href="#github-actions-daily-sync">Daily sync</a> ·
-    <a href="#troubleshooting">Troubleshooting</a>
+    <a href="#troubleshooting">Troubleshooting</a> ·
     <strong><ins>English</ins></strong> · 
     <a href="README.zh-CN.md">简体中文</a>
   </p>
