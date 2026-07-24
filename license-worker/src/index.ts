@@ -64,13 +64,22 @@ async function verify(request: Request, env: Env): Promise<Response> {
   if (!row) throw new HttpError(404, "许可证不存在");
   if (row.status !== "active") throw new HttpError(403, row.status === "revoked" ? "许可证已撤销" : "许可证已暂停");
   if (row.expires_at && Date.parse(row.expires_at) <= Date.now()) throw new HttpError(403, "许可证已过期");
-  const deviceHash = await sha256(deviceId); const existing = await env.DB.prepare("SELECT id FROM activations WHERE license_id=?1 AND device_hash=?2").bind(row.id, deviceHash).first();
-  if (!existing) {
-    const count = await env.DB.prepare("SELECT COUNT(*) count FROM activations WHERE license_id=?1 AND client_type=?2").bind(row.id, clientType).first<{count:number}>();
-    const limit = clientType === "github-actions" ? ACTIONS_LIMIT : row.device_limit;
-    if ((count?.count || 0) >= limit) throw new HttpError(403, clientType === "github-actions" ? "该许可证已绑定其他 GitHub Actions 仓库" : "已达到浏览器设备数量上限");
-    await env.DB.prepare("INSERT INTO activations(id,license_id,device_hash,extension_version,client_type,device_label) VALUES(?1,?2,?3,?4,?5,?6)").bind(id("act_"),row.id,deviceHash,str(body.extensionVersion)||null,clientType,deviceLabel).run();
-  } else await env.DB.prepare("UPDATE activations SET last_seen_at=CURRENT_TIMESTAMP,extension_version=?1,device_label=COALESCE(?2,device_label) WHERE license_id=?3 AND device_hash=?4").bind(str(body.extensionVersion)||null,deviceLabel,row.id,deviceHash).run();
+  const deviceHash = await sha256(deviceId);
+  const limit = clientType === "github-actions" ? ACTIONS_LIMIT : row.device_limit;
+  const activation = await env.DB.prepare(`
+    INSERT INTO activations(id,license_id,device_hash,extension_version,client_type,device_label)
+    SELECT ?1,?2,?3,?4,?5,?6
+    WHERE EXISTS(
+      SELECT 1 FROM activations WHERE license_id=?2 AND device_hash=?3
+    ) OR (
+      SELECT COUNT(*) FROM activations WHERE license_id=?2 AND client_type=?5
+    ) < ?7
+    ON CONFLICT(license_id,device_hash) DO UPDATE SET
+      last_seen_at=CURRENT_TIMESTAMP,
+      extension_version=excluded.extension_version,
+      device_label=COALESCE(excluded.device_label,activations.device_label)
+  `).bind(id("act_"),row.id,deviceHash,str(body.extensionVersion)||null,clientType,deviceLabel,limit).run();
+  if (activation.meta.changes === 0) throw new HttpError(403, clientType === "github-actions" ? "该许可证已绑定其他 GitHub Actions 仓库" : "已达到浏览器设备数量上限");
   return json({ valid: true, license: { id: row.id, customerId: row.customer_id, plan: row.plan, expiresAt: row.expires_at, supportPriority: !!row.support_priority, browserDeviceLimit: row.device_limit, actionsLimit: ACTIONS_LIMIT }, clientType });
 }
 
@@ -81,11 +90,11 @@ async function verifyTrial(request: Request, env: Env): Promise<Response> {
   let row = await env.DB.prepare("SELECT * FROM trials WHERE subject_hash=?1").bind(subjectHash).first<any>();
   if (!row) {
     const startedAt = new Date(); const expiresAt = new Date(startedAt.getTime() + TRIAL_DAYS * 86400000);
-    await env.DB.prepare("INSERT INTO trials(id,subject_hash,device_hash,extension_version,started_at,expires_at) VALUES(?1,?2,?3,?4,?5,?6)").bind(id("tri_"),subjectHash,deviceHash,str(body.extensionVersion)||null,startedAt.toISOString(),expiresAt.toISOString()).run();
-    row = { status:"active", started_at:startedAt.toISOString(), expires_at:expiresAt.toISOString() };
-  } else {
-    await env.DB.prepare("UPDATE trials SET last_seen_at=CURRENT_TIMESTAMP,extension_version=?1,device_hash=?2 WHERE subject_hash=?3").bind(str(body.extensionVersion)||null,deviceHash,subjectHash).run();
+    await env.DB.prepare("INSERT OR IGNORE INTO trials(id,subject_hash,device_hash,extension_version,started_at,expires_at) VALUES(?1,?2,?3,?4,?5,?6)").bind(id("tri_"),subjectHash,deviceHash,str(body.extensionVersion)||null,startedAt.toISOString(),expiresAt.toISOString()).run();
+    row = await env.DB.prepare("SELECT * FROM trials WHERE subject_hash=?1").bind(subjectHash).first<any>();
   }
+  if (!row) throw new HttpError(500, "试用状态创建失败");
+  await env.DB.prepare("UPDATE trials SET last_seen_at=CURRENT_TIMESTAMP,extension_version=?1,device_hash=?2 WHERE subject_hash=?3").bind(str(body.extensionVersion)||null,deviceHash,subjectHash).run();
   if (row.status !== "active") throw new HttpError(403, "该设备试用已停用", { code:"TRIAL_BLOCKED" });
   if (Date.parse(row.expires_at) <= Date.now()) throw new HttpError(403, "7 天完整试用已结束，请选择订阅方案", { code:"TRIAL_EXPIRED", trialExpired:true, expiresAt:row.expires_at });
   return json({ valid:true, trial:{ startedAt:row.started_at, expiresAt:row.expires_at, days:TRIAL_DAYS, fullAccess:true } });
