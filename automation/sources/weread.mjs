@@ -126,7 +126,11 @@ function isRetryableGatewayFailure(status, message) {
 
 function retryAfterFrom(response, data) {
   const header = response?.headers?.get?.("retry-after");
-  const value = header ?? data.retry_after ?? data.retryAfter;
+  if (header !== undefined && header !== null && header !== "") {
+    const seconds = Number(header);
+    return Number.isFinite(seconds) ? seconds * 1000 : null;
+  }
+  const value = data.retry_after ?? data.retryAfter;
   if (value === undefined || value === null || value === "") return null;
   const number = Number(value);
   if (!Number.isFinite(number)) return null;

@@ -63,9 +63,8 @@ function isRetryableNetworkError(error) {
 function retryAfterFrom(response) {
   const value = response?.headers?.get?.("retry-after");
   if (value === undefined || value === null || value === "") return null;
-  const number = Number(value);
-  if (!Number.isFinite(number)) return null;
-  return number < 100 ? number * 1000 : number;
+  const seconds = Number(value);
+  return Number.isFinite(seconds) ? seconds * 1000 : null;
 }
 
 async function retryWait(baseDelayMs, attempt, options, error) {
