@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { normalizeDouban, normalizeDoubanUserId, signedDoubanUrl } from "../automation/sources/douban.mjs";
-import { parseDoubanTop250 } from "../extension/lib/douban-top250.js";
+import { DOUBAN_TOP250_TARGETS, fetchAllDoubanTop250, parseDoubanTop250 } from "../extension/lib/douban-top250.js";
 
 test("normalizes a Douban book interest", () => {
   const item = normalizeDouban({ status: "done", create_time: "2026-07-01T12:00:00+08:00", comment: "值得重读", rating: { value: 5 }, tags: [{ name: "社会学" }], subject: { id: "42", title: "测试书", url: "https://book.douban.com/subject/42/", author: ["某作者"], intro: "简介", genres: ["非虚构"] } }, "book");
@@ -32,4 +32,46 @@ test("parses movie, book and music Top 250 entries", () => {
   assert.deepEqual([music.metadata.artist,music.metadata.releaseDate,music.metadata.releaseType,music.metadata.medium,music.metadata.genres],["Jason Mraz","2008-05-13","Import","Audio CD",["民谣","流行"]]);
   assert.deepEqual([music.title,music.author,music.source],["We Sing","Jason Mraz","doubanMusicTop250"]);
   assert.match(book.coverUrl,/\/l\/public\//);
+});
+
+test("retries a transient Top 250 connection failure", async () => {
+  let calls = 0;
+  const fetchImpl = async (url) => {
+    calls++;
+    if (calls === 1) {
+      const error = new TypeError("fetch failed");
+      error.cause = { code: "UND_ERR_CONNECT_TIMEOUT" };
+      throw error;
+    }
+    const start = Number(new URL(url).searchParams.get("start"));
+    const rows = Array.from({ length: 25 }, (_, index) => {
+      const rank = start + index + 1;
+      return `<li><em>${rank}</em><a href="https://movie.douban.com/subject/${100000 + rank}/"><img alt="电影${rank}" src="https://img.test/${rank}.jpg"></a><p>导演: 导演 / 2020 / 中国 / 剧情</p><span class="rating_num">8.0</span><span>1人评价</span></li>`;
+    }).join("");
+    return { ok: true, status: 200, text: async () => `<ol class="grid_view">${rows}</ol>` };
+  };
+  const result = await fetchAllDoubanTop250({
+    targets: [DOUBAN_TOP250_TARGETS[0]],
+    fetchImpl,
+    delayMs: 0,
+    retryDelayMs: 0
+  });
+  assert.equal(result.doubanMovieTop250.length, 250);
+  assert.equal(calls, 11);
+});
+
+test("does not retry a permanent Top 250 response", async () => {
+  let calls = 0;
+  await assert.rejects(
+    fetchAllDoubanTop250({
+      targets: [DOUBAN_TOP250_TARGETS[0]],
+      fetchImpl: async () => {
+        calls++;
+        return { ok: false, status: 403, text: async () => "" };
+      },
+      retryDelayMs: 0
+    }),
+    /豆瓣电影 Top 250 请求失败 \(403\)/
+  );
+  assert.equal(calls, 1);
 });

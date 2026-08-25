@@ -12,7 +12,7 @@ let failedCount=0;
 const doubanCoverMessages=new Set();
 
 if(source==="all"||source==="weread"){
-  const items=await getWereadItems(required("WEREAD_API_KEY"));
+  const items=await getWereadItems(required("WEREAD_API_KEY"),{onRetry:({attempt,delayMs,error})=>console.warn(`微信读书请求临时失败，${Math.round(delayMs/1000)} 秒后重试 ${attempt}：${error.message}`)});
   failedCount+=await syncSource("weread",databaseId("WEREAD"),items);
 }
 if(source==="all"||source==="douban"){
@@ -21,7 +21,7 @@ if(source==="all"||source==="douban"){
   const userResult=await enrichMovieCovers(hostedUser.items,{provider,tmdbAccessToken,onProgress:tmdbProgress});
   const items=userResult.items;
   failedCount+=await syncSource("douban",databaseId("DOUBAN"),items);
-  const top250=await fetchAllDoubanTop250({headers:{"User-Agent":"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/138.0 Safari/537.36"}});
+  const top250=await fetchAllDoubanTop250({headers:{"User-Agent":"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/138.0 Safari/537.36"},onRetry:({attempt,delayMs,error})=>console.warn(`豆瓣 Top 250 请求临时失败，${Math.round(delayMs/1000)} 秒后重试 ${attempt}：${error.message}`)});
   for(const target of DOUBAN_TOP250_TARGETS)top250[target.source]=(await enrichDoubanHostedCovers(top250[target.source],{provider:doubanImageProvider,onStatus:doubanCoverStatus})).items;
   const movieResult=await enrichMovieCovers(top250.doubanMovieTop250,{provider,tmdbAccessToken,onProgress:tmdbProgress});
   top250.doubanMovieTop250=movieResult.items;

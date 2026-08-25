@@ -6,20 +6,21 @@ export const DOUBAN_TOP250_TARGETS = [
 
 export async function fetchAllDoubanTop250(options = {}) {
   const fetchImpl = options.fetchImpl || fetch;
+  const targets = options.targets || DOUBAN_TOP250_TARGETS;
   const capturedAt = new Date().toISOString();
   const result = {};
-  for (const target of DOUBAN_TOP250_TARGETS) {
+  for (const target of targets) {
     const items = [];
     for (let start = 0; start < 250; start += 25) {
       if (options.signal?.aborted) throw new Error("同步已停止");
       const url = target.origin + "/top250?start=" + start;
       await options.onProgress?.({ source: target.source, label: target.label, start, completedPages: start / 25, totalPages: 10 });
-      const response = await fetchImpl(url, {
+      const response = await fetchWithRetry(fetchImpl, url, {
         credentials: "omit",
         cache: "no-store",
         signal: options.signal,
         headers: { Accept: "text/html,application/xhtml+xml", ...(options.headers || {}) }
-      });
+      }, options);
       const html = await response.text();
       if (!response.ok) throw new Error("豆瓣" + target.label + " Top 250 请求失败 (" + response.status + ")");
       const pageItems = parseDoubanTop250(html, target.kind, start, capturedAt);
@@ -32,6 +33,46 @@ export async function fetchAllDoubanTop250(options = {}) {
     result[target.source] = unique;
   }
   return result;
+}
+
+async function fetchWithRetry(fetchImpl, url, init, options) {
+  const maxRetries = Math.max(0, options.maxRetries ?? 3);
+  const baseDelayMs = Math.max(0, options.retryDelayMs ?? 1_000);
+  for (let attempt = 0; ; attempt++) {
+    let response;
+    try {
+      response = await fetchImpl(url, init);
+    } catch (error) {
+      if (init.signal?.aborted || error?.name === "AbortError" || attempt >= maxRetries || !isRetryableNetworkError(error)) throw error;
+      await retryWait(baseDelayMs, attempt, options, error);
+      continue;
+    }
+    if (!isRetryableStatus(response.status) || attempt >= maxRetries) return response;
+    await retryWait(retryAfterFrom(response) ?? baseDelayMs, attempt, options, new Error(`豆瓣请求失败 (${response.status})`));
+  }
+}
+
+function isRetryableStatus(status) {
+  return [408, 425, 429].includes(Number(status)) || Number(status) >= 500;
+}
+
+function isRetryableNetworkError(error) {
+  return error instanceof TypeError || ["UND_ERR_CONNECT_TIMEOUT", "ECONNRESET", "ETIMEDOUT", "ECONNREFUSED", "EAI_AGAIN"].includes(error?.code) || Boolean(error?.cause?.code);
+}
+
+function retryAfterFrom(response) {
+  const value = response?.headers?.get?.("retry-after");
+  if (value === undefined || value === null || value === "") return null;
+  const number = Number(value);
+  if (!Number.isFinite(number)) return null;
+  return number < 100 ? number * 1000 : number;
+}
+
+async function retryWait(baseDelayMs, attempt, options, error) {
+  const jitter = options.retryJitterMs === false ? 0 : Math.floor(Math.random() * 250);
+  const delayMs = Math.max(0, baseDelayMs * (2 ** attempt) + jitter);
+  await options.onRetry?.({ attempt: attempt + 1, delayMs, error });
+  if (delayMs) await pause(delayMs, options.signal);
 }
 
 export function parseDoubanTop250(html, kind, start = 0, capturedAt = new Date().toISOString()) {

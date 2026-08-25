@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { readFileSync } from "node:fs";
 import { fetchWereadInPage } from "../extension/lib/sources.js";
+import { getWereadItems } from "../automation/sources/weread.mjs";
 
 const background = readFileSync(new URL("../extension/background.js", import.meta.url), "utf8");
 const options = readFileSync(new URL("../extension/options.html", import.meta.url), "utf8");
@@ -40,4 +41,42 @@ test("offers browser-login and optional Gateway configuration", () => {
   assert.match(optionsClient, /wereadApiKey/);
   assert.match(background, /fetchWereadFromLoggedInTab/);
   assert.match(background, /settings\.wereadApiKey \? await fetchWeread/);
+});
+
+test("retries a WeRead Gateway rate limit before failing the book", async () => {
+  let calls = 0;
+  const fetchImpl = async (_url, init) => {
+    calls++;
+    const body = JSON.parse(init.body);
+    if (body.api_name === "/book/chapterinfo" && calls === 4) {
+      return { ok: false, status: 429, headers: { get: () => "0" }, json: async () => ({ errmsg: "请求频率超限，请稍后再试" }) };
+    }
+    const data = body.api_name === "/user/notebooks"
+      ? { books: [{ book: { bookId: "book-1", title: "测试书" } }] }
+      : body.api_name === "/book/bookmarklist"
+        ? { updated: [] }
+        : body.api_name === "/review/list/mine"
+          ? { reviews: [], hasMore: false }
+          : { chapters: [] };
+    return { ok: true, status: 200, headers: { get: () => null }, json: async () => data };
+  };
+  const items = await getWereadItems("key", { fetchImpl, retryDelayMs: 0, minIntervalMs: 0 });
+  assert.equal(items[0].externalId, "book-1");
+  assert.equal(calls, 5);
+});
+
+test("does not retry a permanent WeRead authentication error", async () => {
+  let calls = 0;
+  await assert.rejects(
+    getWereadItems("key", {
+      fetchImpl: async () => {
+        calls++;
+        return { ok: false, status: 401, headers: { get: () => null }, json: async () => ({ errmsg: "用户不存在" }) };
+      },
+      retryDelayMs: 0,
+      minIntervalMs: 0
+    }),
+    /用户不存在/
+  );
+  assert.equal(calls, 1);
 });
