@@ -80,3 +80,25 @@ test("does not retry a permanent WeRead authentication error", async () => {
   );
   assert.equal(calls, 1);
 });
+
+test("serializes the three Gateway calls for each WeRead book", async () => {
+  let active = 0;
+  let maxActive = 0;
+  const fetchImpl = async (_url, init) => {
+    active++;
+    maxActive = Math.max(maxActive, active);
+    await new Promise((resolve) => setTimeout(resolve, 1));
+    const body = JSON.parse(init.body);
+    const data = body.api_name === "/user/notebooks"
+      ? { books: [{ book: { bookId: "book-1", title: "测试书" } }] }
+      : body.api_name === "/book/bookmarklist"
+        ? { updated: [] }
+        : body.api_name === "/review/list/mine"
+          ? { reviews: [], hasMore: false }
+          : { chapters: [] };
+    active--;
+    return { ok: true, status: 200, headers: { get: () => null }, json: async () => data };
+  };
+  await getWereadItems("key", { fetchImpl, retryDelayMs: 0, minIntervalMs: 0 });
+  assert.equal(maxActive, 1);
+});

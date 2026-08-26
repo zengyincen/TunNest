@@ -1,8 +1,8 @@
 const GATEWAY = "https://i.weread.qq.com/api/agent/gateway";
 
-const DEFAULT_RETRIES = 4;
-const DEFAULT_RETRY_DELAY_MS = 1_500;
-const DEFAULT_MIN_INTERVAL_MS = 250;
+const DEFAULT_RETRIES = 6;
+const DEFAULT_RETRY_DELAY_MS = 5_000;
+const DEFAULT_MIN_INTERVAL_MS = 1_200;
 
 export async function getWereadItems(apiKey, options = {}) {
   if (!apiKey) throw new Error("缺少 WEREAD_API_KEY");
@@ -22,11 +22,9 @@ export async function getWereadItems(apiKey, options = {}) {
     const book = entry.book || entry;
     const bookId = String(book.bookId || "");
     if (!bookId) continue;
-    const [marks, notes, chaptersData] = await Promise.all([
-      client("/book/bookmarklist", { bookId }),
-      allReviews(client, bookId),
-      client("/book/chapterinfo", { bookId })
-    ]);
+    const marks = await client("/book/bookmarklist", { bookId });
+    const notes = await allReviews(client, bookId);
+    const chaptersData = await client("/book/chapterinfo", { bookId });
     const chapters = Object.fromEntries((chaptersData.chapters || []).map((chapter) => [
       String(chapter.chapterUid), chapter.title || chapter.chapterTitle || ""
     ]));
@@ -68,13 +66,13 @@ function createGatewayClient(apiKey, options) {
   const fetchImpl = options.fetchImpl || fetch;
   const minIntervalMs = Math.max(0, options.minIntervalMs ?? DEFAULT_MIN_INTERVAL_MS);
   let nextRequestAt = 0;
-  return async (apiName, params = {}) => {
+  const acquire = async () => {
     const now = Date.now();
     const waitMs = Math.max(0, nextRequestAt - now);
     nextRequestAt = Math.max(now, nextRequestAt) + minIntervalMs;
     if (waitMs) await pause(waitMs);
-    return gateway(apiKey, apiName, params, { ...options, fetchImpl });
   };
+  return (apiName, params = {}) => gateway(apiKey, apiName, params, { ...options, fetchImpl, beforeAttempt: acquire });
 }
 
 async function allReviews(client, bookId) {
@@ -97,6 +95,7 @@ async function gateway(apiKey, apiName, params, options = {}) {
     let response;
     let data = {};
     try {
+      await options.beforeAttempt?.();
       response = await fetchImpl(GATEWAY, {
         method: "POST",
         headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
